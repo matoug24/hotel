@@ -16,7 +16,22 @@ all time in libya time
  - otp for booking
  - limit visitors
  - integrate with facebook messenger
- - direct payment. 
+ - direct payment.
 
 
- I want to add a new tab in the admin page called users. I want to do the following. list all the users assosiated with this hotel, to the right of each username, there is an opiton to delete the user, or change the password. no need to keep change password in the settins tab. in additon to these, I want to add a button called Create a new user. this will create a staff usernamer
+
+v29:
+
+server {
+    listen 80;
+    server_name yourdomain.com;
+
+    client_max_body_size 10M;  # <--- CRITICAL: Allow up to 10MB uploads
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+

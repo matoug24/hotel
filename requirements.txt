@@ -10,3 +10,7 @@ Pillow
 passlib[argon2]
 argon2-cffi
 pytz
+slowapi
+python-dotenv
+python-jose[cryptography]
+requests

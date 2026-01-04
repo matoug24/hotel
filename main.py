@@ -3,6 +3,7 @@ import os
 import io
 import pytz
 import uuid
+import logging
 from typing import List, Optional
 from datetime import datetime, timedelta, date
 from fastapi import FastAPI, Depends, Request, Form, UploadFile, File, HTTPException, status
@@ -10,22 +11,62 @@ from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from PIL import Image
 from passlib.context import CryptContext
+from dotenv import load_dotenv
 
-import models
+# NEW: Rate Limiting
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
+
+# Import from refactored database.py
 from database import engine, get_db
+import models
 
+# --- CONFIGURATION ---
+load_dotenv() # Load .env variables
+OWNER_PASSWORD = os.getenv("OWNER_PASSWORD", "owner")
+MAX_FILE_SIZE_MB = 5
+
+# --- LOGGING ---
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("hotel_app")
+
+# --- INITIALIZE DB ---
 models.Base.metadata.create_all(bind=engine)
 
+# --- RATE LIMITER ---
+limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
+
 app = FastAPI()
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
+# --- SECURITY MIDDLEWARE ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+app.add_middleware(
+    TrustedHostMiddleware, 
+    allowed_hosts=["*"]
+)
+
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 LIBYA_TZ = pytz.timezone('Africa/Tripoli')
-
-# GENERATE OWNER HASH ON STARTUP
-OWNER_HASH = pwd_context.hash("owner")
+OWNER_HASH = pwd_context.hash(OWNER_PASSWORD)
 
 os.makedirs("static/uploads", exist_ok=True)
 os.makedirs("static/css", exist_ok=True)
@@ -34,8 +75,7 @@ templates = Jinja2Templates(directory="templates")
 
 security = HTTPBasic()
 
-def get_current_time():
-    return datetime.now(LIBYA_TZ)
+def get_current_time(): return datetime.now(LIBYA_TZ)
 
 # --- DEPENDENCIES ---
 def get_config(extension: str, db: Session = Depends(get_db)):
@@ -51,10 +91,8 @@ def verify_hotel_admin(request: Request, credentials: HTTPBasicCredentials = Dep
     if not extension: raise HTTPException(status_code=404, detail="Could not determine hotel context")
     config = db.query(models.SiteConfig).filter(models.SiteConfig.extension == extension).first()
     if not config: raise HTTPException(status_code=404, detail="Hotel not found")
-    
     if credentials.username == "owner" and pwd_context.verify(credentials.password, OWNER_HASH):
         return {"config": config, "user": models.User(username="SiteOwner", role="admin")}
-        
     user = db.query(models.User).filter(models.User.username == credentials.username, models.User.site_config_id == config.id).first()
     if not user or not pwd_context.verify(credentials.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials", headers={"WWW-Authenticate": "Basic"})
@@ -67,7 +105,6 @@ def verify_owner(credentials: HTTPBasicCredentials = Depends(security)):
 
 # --- HELPERS ---
 def log_activity(db: Session, config_id: int, user: str, action: str, target: str, details: str):
-    # Truncate details if too long to prevent DB errors
     safe_details = (details[:495] + '..') if len(details) > 500 else details
     new_log = models.AuditLog(site_config_id=config_id, timestamp=get_current_time().replace(tzinfo=None), user=user, action=action, target=target, details=safe_details)
     db.add(new_log)
@@ -94,10 +131,28 @@ def calculate_price(db: Session, config_id: int, room_id: int, start: datetime, 
         curr += timedelta(days=1)
     return total * count
 
+async def validate_and_save_image(upload_file: UploadFile, destination: str, target_type: str):
+    upload_file.file.seek(0, 2)
+    file_size = upload_file.file.tell()
+    upload_file.file.seek(0)
+    if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
+        raise HTTPException(status_code=400, detail=f"File too large. Max size is {MAX_FILE_SIZE_MB}MB")
+    content = upload_file.file.read()
+    try:
+        img = Image.open(io.BytesIO(content))
+        img.verify(); img = Image.open(io.BytesIO(content))
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid image file")
+    if img.mode != 'RGB': img = img.convert('RGB')
+    if target_type == 'hero': 
+        ar = img.width/img.height; w = int(450*ar); img = img.resize((w, 450), Image.Resampling.LANCZOS)
+    else: 
+        img.thumbnail((250, 250))
+    img.save(destination, quality=85, optimize=True)
+
 # --- GLOBAL ROUTES ---
 @app.get("/app/{extension}/admin/logout_bypass")
-def logout_bypass(extension: str):
-    return {"status": "logged_out"}
+def logout_bypass(extension: str): return {"status": "logged_out"}
 
 @app.get("/logout")
 def logout(target_path: Optional[str] = None):
@@ -106,22 +161,20 @@ def logout(target_path: Optional[str] = None):
     if target_path and "/admin" in target_path:
         parts = target_path.split('/')
         if len(parts) > 2:
-            extension = parts[2]
-            poison_target = f"/app/{extension}/admin/logout_bypass"
-            redirect_to = f"/app/{extension}"
-
+            extension = parts[2]; poison_target = f"/app/{extension}/admin/logout_bypass"; redirect_to = f"/app/{extension}"
     html_content = f"""<!DOCTYPE html><html><head><title>Logging Out...</title></head><body><h3 style="font-family:sans-serif; text-align:center; margin-top:20%;">Logging out...</h3><script>var target = "{poison_target}";var xhr = new XMLHttpRequest();xhr.open("GET", target, true);xhr.setRequestHeader("Authorization", "Basic " + btoa("logout:logout"));xhr.onreadystatechange = function() {{if (xhr.readyState == 4) {{window.location.href = "{redirect_to}";}}}};xhr.send();</script></body></html>"""
     return HTMLResponse(content=html_content)
 
 @app.get("/reset_db")
-def reset_db(db: Session = Depends(get_db)):
+def reset_db(db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
     db.query(models.AuditLog).delete(); db.query(models.Booking).delete(); db.query(models.RoomImage).delete()
     db.query(models.MaintenanceBlock).delete(); db.query(models.SeasonalRate).delete()
     db.query(models.RoomUnit).delete(); db.query(models.RoomType).delete(); db.query(models.HeroImage).delete(); db.query(models.SiteConfig).delete(); db.query(models.User).delete()
     default_hash = pwd_context.hash("password123")
     config = models.SiteConfig(admin_password_hash=default_hash, booking_expiration_hours=24, highlights="Experience paradise.", about_description="Welcome.", amenities_list="Free Wi-Fi")
     db.add(config); db.commit()
-    return "Database cleared & Updated!"
+    logger.warning("DATABASE WAS RESET BY OWNER")
+    return "Database cleared & Updated! (Action logged)"
 
 # --- OWNER ROUTES ---
 @app.get("/owner", response_class=HTMLResponse)
@@ -145,12 +198,14 @@ def reset_hotel_password(config_id: int = Form(...), role: str = Form(...), db: 
 
 # --- PUBLIC ROUTES ---
 @app.get("/app/{extension}", response_class=HTMLResponse)
+@limiter.limit("60/minute")
 def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
     config = get_config(extension, db)
     if not config.is_active: return templates.TemplateResponse("maintenance.html", {"request": request})
     return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images})
 
 @app.post("/app/{extension}/search", response_class=HTMLResponse)
+@limiter.limit("20/minute")
 def hotel_search(request: Request, extension: str, check_in: str = Form(...), check_out: str = Form(...), guests: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
     c_in = datetime.strptime(check_in, "%Y-%m-%d"); c_out = datetime.strptime(check_out, "%Y-%m-%d")
@@ -170,9 +225,7 @@ def hotel_search(request: Request, extension: str, check_in: str = Form(...), ch
 def book_page(request: Request, extension: str, room_id: int, check_in: Optional[str] = None, check_out: Optional[str] = None, guests: int = 1, db: Session = Depends(get_db)):
     config = get_config(extension, db)
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == config.id).first()
-    if not check_in or not check_out:
-        check_in = datetime.now().strftime("%Y-%m-%d")
-        check_out = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+    if not check_in or not check_out: check_in = datetime.now().strftime("%Y-%m-%d"); check_out = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
     return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room, "prefill_check_in": check_in, "prefill_check_out": check_out, "prefill_guests": guests})
 
 @app.get("/api/calendar_events")
@@ -182,8 +235,7 @@ def get_calendar_events(room_id: int, start: str, end: str, db: Session = Depend
     if not room: return JSONResponse([])
     events = []; curr = start_dt
     while curr < end_dt:
-        nxt = curr + timedelta(days=1)
-        check_time = curr + timedelta(hours=23, minutes=59)
+        nxt = curr + timedelta(days=1); check_time = curr + timedelta(hours=23, minutes=59)
         booked = db.query(func.count(models.Booking.id)).filter(models.Booking.room_type_id == room_id, models.Booking.status.in_(['confirmed', 'pending']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar()
         blocked = db.query(func.sum(models.MaintenanceBlock.qty_blocked)).filter(models.MaintenanceBlock.room_type_id == room_id, models.MaintenanceBlock.start_date <= curr.date(), models.MaintenanceBlock.end_date > curr.date()).scalar() or 0
         remaining = room.total_quantity - booked - blocked
@@ -196,8 +248,7 @@ def get_calendar_events(room_id: int, start: str, end: str, db: Session = Depend
 def api_calculate_price(extension: str, room_id: int = Form(...), check_in: str = Form(...), check_out: str = Form(...), rooms_needed: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
     try:
-        c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0)
-        c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
+        c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0); c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
         if c_out <= c_in: return JSONResponse({"error": "Invalid dates"}, status_code=400)
         total = calculate_price(db, config.id, room_id, c_in, c_out, rooms_needed)
         nights = (c_out - c_in).days
@@ -205,6 +256,7 @@ def api_calculate_price(extension: str, room_id: int = Form(...), check_in: str 
     except Exception as e: return JSONResponse({"error": str(e)}, status_code=400)
 
 @app.post("/app/{extension}/book/confirm")
+@limiter.limit("5/minute")
 def book_confirm(request: Request, extension: str, room_id: int = Form(...), guest_name: str = Form(...), guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), check_in: str = Form(...), check_out: str = Form(...), rooms_needed: int = Form(1), guests_count: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
     c_in = datetime.strptime(check_in, "%Y-%m-%d"); c_out = datetime.strptime(check_out, "%Y-%m-%d")
@@ -225,7 +277,7 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
         b_code = f"RES-{uuid.uuid4().hex[:6].upper()}"
         bk = models.Booking(site_config_id=config.id, room_type_id=room_id, room_unit_id=available_units[i].id, booking_code=b_code, guest_name=guest_name, guest_email=guest_email, guest_phone=guest_phone, check_in=c_in, check_out=c_out, total_price=total_one, rooms_booked=1, guests_count=guests_count, created_at=datetime.now())
         db.add(bk); created_bookings.append(bk)
-        log_activity(db, config.id, "Guest", "New Booking", b_code, f"{guest_name} booked {available_units[i].label} ({nights} nights)")
+        log_activity(db, config.id, "Guest", "New Booking", b_code, f"{guest_name} booked {available_units[i].label}")
     db.commit()
     return templates.TemplateResponse("success.html", {"request": request, "config": config, "bookings": created_bookings, "total_cost": total_all, "nights": nights})
 
@@ -233,40 +285,32 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
 @app.get("/app/{extension}/admin", response_class=HTMLResponse)
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
-    
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     all_units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
     seasons = db.query(models.SeasonalRate).filter(models.SeasonalRate.site_config_id == config.id).all()
     blocks = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
-    
     today = get_current_time().date(); tomorrow = today + timedelta(days=1)
     base_q = db.query(models.Booking).filter(models.Booking.site_config_id == config.id)
     search_results = []
     if search: search_results = base_q.filter(or_(models.Booking.booking_code.ilike(f"%{search}%"), models.Booking.guest_name.ilike(f"%{search}%"))).all()
-    
     checkins_today = base_q.filter(func.date(models.Booking.check_in) == today, models.Booking.status != 'cancelled').all()
     checkouts_today = base_q.filter(func.date(models.Booking.check_out) == today, models.Booking.status != 'cancelled').all()
     checkins_tmrw = base_q.filter(func.date(models.Booking.check_in) == tomorrow, models.Booking.status != 'cancelled').all()
     checkouts_tmrw = base_q.filter(func.date(models.Booking.check_out) == tomorrow, models.Booking.status != 'cancelled').all()
-    
     upcoming_q = base_q.filter(func.date(models.Booking.check_in) >= today)
     upcoming = upcoming_q.order_by(models.Booking.created_at.desc()).all() if sort_by == 'created' else upcoming_q.order_by(models.Booking.check_in.asc()).all()
     active_bookings = base_q.filter(models.Booking.status == 'checked_in').order_by(models.Booking.check_out.asc()).all()
-    
     revenue = sum([b.total_price for b in upcoming if b.status in ['confirmed', 'checked_in', 'checked_out']])
     future_dep = db.query(func.sum(models.Booking.deposit_amount)).filter(models.Booking.site_config_id == config.id, func.date(models.Booking.check_in) >= today, models.Booking.status.in_(['confirmed', 'checked_in'])).scalar() or 0.0
     confirmed_b = base_q.filter(func.date(models.Booking.check_in) >= today, models.Booking.status == 'confirmed').all()
     outstanding = sum([b.total_price - b.deposit_amount for b in confirmed_b])
-    
     chart_labels = []; chart_data = []
     for i in range(14):
         day_t = today + timedelta(days=i); chart_labels.append(day_t.strftime("%b %d"))
         day_b = base_q.filter(func.date(models.Booking.check_in) == day_t, models.Booking.status == 'confirmed').all()
         chart_data.append(sum([b.total_price - b.deposit_amount for b in day_b]))
-    
     logs = db.query(models.AuditLog).filter(models.AuditLog.site_config_id == config.id).order_by(models.AuditLog.timestamp.desc()).limit(100).all()
-    
     total_capacity = sum([r.total_quantity for r in rooms])
     occupied = base_q.filter(models.Booking.check_in <= today, models.Booking.check_out > today, models.Booking.status.in_(['checked_in', 'confirmed'])).count()
     occupancy_rate = int((occupied / total_capacity * 100) if total_capacity > 0 else 0)
@@ -294,8 +338,7 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
         if m.room_unit_id: items.append({"id": f"maint_{m.id}", "group": m.room_unit_id, "content": "BLOCKED", "start": m.start_date.isoformat(), "end": m.end_date.isoformat(), "style": "background-color: black; opacity: 0.5; border-radius: 6px;", "type": "background"})
     return JSONResponse(content={"groups": groups, "items": items})
 
-# --- COMPREHENSIVE LOGGING CRUD ---
-
+# --- ADMIN CRUD ---
 @app.post("/app/{extension}/admin/update_site")
 def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), contact_email: str = Form(""), contact_phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
     if context['user'].role != 'admin': return "Unauthorized"
@@ -304,12 +347,12 @@ def update_site(extension: str, hotel_name: str = Form(...), highlights: str = F
     config.contact_email = contact_email; config.contact_phone = contact_phone; config.address = address; config.map_url = map_url
     config.facebook = facebook; config.instagram = instagram; config.youtube = youtube; config.rules = rules; config.booking_success_message = booking_success_message
     config.theme_id = theme_id; config.booking_expiration_hours = booking_expiration_hours
-    log_activity(db, config.id, context['user'].username, "Update Settings", "Site Config", "General settings updated")
+    log_activity(db, config.id, "Admin", "Update Settings", "Site Config", "Settings updated")
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Settings+Updated#site", status_code=303)
 
 @app.post("/app/{extension}/admin/add_room")
-def add_room(extension: str, name: str = Form(...), price: float = Form(...), qty: int = Form(...), desc: str = Form(""), capacity: int = Form(2), custom_labels: str = Form(""), images: List[UploadFile] = File(None), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
+async def add_room(extension: str, name: str = Form(...), price: float = Form(...), qty: int = Form(...), desc: str = Form(""), capacity: int = Form(2), custom_labels: str = Form(""), images: List[UploadFile] = File(None), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']
     new_room = models.RoomType(site_config_id=config.id, name=name, price_per_night=price, total_quantity=qty, description=desc, capacity=capacity)
     db.add(new_room); db.commit()
@@ -317,15 +360,13 @@ def add_room(extension: str, name: str = Form(...), price: float = Form(...), qt
     for i in range(qty):
         lbl = raw_labels[i] if i < len(raw_labels) else f"{name} #{i+1}"
         db.add(models.RoomUnit(room_type_id=new_room.id, label=lbl))
-    log_activity(db, config.id, context['user'].username, "Create Room", name, f"Price: {price}, Qty: {qty}, Cap: {capacity}")
     if images:
         for img in images:
             if img.filename:
                 path = f"static/uploads/room_{new_room.id}_{uuid.uuid4().hex[:6]}.jpg"
-                content = img.file.read(); i = Image.open(io.BytesIO(content))
-                if i.mode != 'RGB': i = i.convert('RGB')
-                i.thumbnail((250, 250)); i.save(path, quality=85)
+                await validate_and_save_image(img, path, "room")
                 db.add(models.RoomImage(room_id=new_room.id, image_url=f"/{path}"))
+    log_activity(db, config.id, "Admin", "Create Room", name, f"Created with {qty} units")
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#rooms", status_code=303)
 
@@ -337,7 +378,7 @@ def add_season(extension: str, name: str = Form(...), start: str = Form(...), en
     conflict = db.query(models.SeasonalRate).filter(models.SeasonalRate.site_config_id == config.id, models.SeasonalRate.room_type_id == room_type_id, models.SeasonalRate.start_date <= e_date, models.SeasonalRate.end_date >= s_date).first()
     if conflict: return RedirectResponse(f"/app/{extension}/admin?error=Date+Overlap+With+{conflict.name}#seasons", status_code=303)
     db.add(models.SeasonalRate(site_config_id=config.id, room_type_id=room_type_id, name=name, start_date=s_date, end_date=e_date, multiplier=multiplier))
-    log_activity(db, config.id, context['user'].username, "Add Season", name, f"{start} to {end} (x{multiplier})")
+    log_activity(db, config.id, "Admin", "Add Season", name, f"x{multiplier}")
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#seasons", status_code=303)
 
@@ -347,7 +388,7 @@ def add_maintenance(extension: str, unit_id: int = Form(...), start: str = Form(
     unit = db.query(models.RoomUnit).filter(models.RoomUnit.id == unit_id).first()
     if not unit or unit.room_type.site_config_id != config.id: return "Invalid Unit"
     db.add(models.MaintenanceBlock(room_type_id=unit.room_type_id, room_unit_id=unit.id, start_date=datetime.strptime(start, "%Y-%m-%d").date(), end_date=datetime.strptime(end, "%Y-%m-%d").date(), reason=reason, qty_blocked=1))
-    log_activity(db, config.id, context['user'].username, "Block Unit", unit.label, f"{start} to {end}: {reason}")
+    log_activity(db, config.id, "Admin", "Block Unit", unit.label, reason)
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#maintenance", status_code=303)
 
@@ -369,14 +410,9 @@ def edit_booking_save(request: Request, extension: str, booking_id: int, guest_n
     
     changes = []
     if booking.status != status: changes.append(f"Status: {booking.status}->{status}")
-    if booking.guest_name != guest_name: changes.append(f"Name: {booking.guest_name}->{guest_name}")
-    if booking.deposit_amount != deposit: changes.append(f"Deposit: {booking.deposit_amount}->{deposit}")
-    
-    if booking.check_in != c_in or booking.check_out != c_out:
-        changes.append(f"Dates changed")
+    if booking.check_in != c_in or booking.check_out != c_out or booking.room_type_id != booking.room_type_id or booking.rooms_booked != booking.rooms_booked:
         new_total = calculate_price(db, config.id, booking.room_type_id, c_in, c_out, booking.rooms_booked)
         booking.total_price = new_total
-
     booking.guest_name = guest_name; booking.guest_email = guest_email; booking.guest_phone = guest_phone
     booking.check_in = c_in; booking.check_out = c_out
     booking.room_unit_id = room_unit_id; booking.status = status; booking.deposit_amount = deposit; booking.notes = notes
@@ -405,20 +441,17 @@ async def new_booking_save(request: Request, extension: str, guest_name: str = F
     total = calculate_price(db, config.id, room_id, c_in, c_out, 1)
     b_code = f"RES-{uuid.uuid4().hex[:6].upper()}"
     new_booking = models.Booking(site_config_id=config.id, room_type_id=room_id, room_unit_id=final_unit_id, booking_code=b_code, guest_name=guest_name, guest_email=guest_email, guest_phone=guest_phone, check_in=c_in, check_out=c_out, status=status, total_price=total, deposit_amount=deposit, rooms_booked=1, notes=notes, created_at=datetime.now())
-    db.add(new_booking); log_activity(db, config.id, context['user'].username, "Create Booking", b_code, f"Manual Admin: {guest_name} ({total})")
+    db.add(new_booking); log_activity(db, config.id, context['user'].username, "Create Booking", b_code, "Manual Admin Creation")
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Booking+Created#bookings", status_code=303)
 
 @app.post("/app/{extension}/admin/upload_hero")
-def upload_hero(extension: str, images: List[UploadFile] = File(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
+async def upload_hero(extension: str, images: List[UploadFile] = File(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     count = 0
     for img in images:
         if img.filename:
             path = f"static/uploads/hero_{extension}_{uuid.uuid4().hex[:6]}.jpg"
-            content = img.file.read(); i = Image.open(io.BytesIO(content))
-            if i.mode != 'RGB': i = i.convert('RGB')
-            ar = i.width/i.height; w = int(450*ar); i = i.resize((w,450))
-            i.save(path, quality=85)
+            await validate_and_save_image(img, path, "hero")
             db.add(models.HeroImage(site_config_id=context['config'].id, image_url=f"/{path}"))
             count += 1
     log_activity(db, context['config'].id, context['user'].username, "Upload Photos", "Hero Slider", f"Uploaded {count} images")
@@ -428,45 +461,46 @@ def upload_hero(extension: str, images: List[UploadFile] = File(...), context: d
 @app.post("/app/{extension}/admin/delete_hero")
 def delete_hero(extension: str, img_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     img = db.query(models.HeroImage).filter(models.HeroImage.id == img_id, models.HeroImage.site_config_id == context['config'].id).first()
-    if img:
-        log_activity(db, context['config'].id, context['user'].username, "Delete Photo", str(img_id), "Hero image removed")
-        db.delete(img); db.commit()
+    if img: db.delete(img); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#hero", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_season")
 def delete_season(extension: str, season_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     s = db.query(models.SeasonalRate).filter(models.SeasonalRate.id == season_id, models.SeasonalRate.site_config_id == context['config'].id).first()
-    if s:
-        log_activity(db, context['config'].id, context['user'].username, "Delete Season", s.name, f"Multiplier {s.multiplier} removed")
-        db.delete(s); db.commit()
+    if s: db.delete(s); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#seasons", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_maintenance")
 def delete_maintenance(extension: str, block_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     b = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.MaintenanceBlock.id == block_id, models.RoomType.site_config_id == context['config'].id).first()
-    if b:
-        log_activity(db, context['config'].id, context['user'].username, "Remove Block", "Unit Block", f"Reason: {b.reason}")
-        db.delete(b); db.commit()
+    if b: db.delete(b); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#maintenance", status_code=303)
+
+@app.get("/app/{extension}/admin/invoice/{booking_id}", response_class=HTMLResponse)
+def generate_invoice(request: Request, extension: str, booking_id: int, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
+    config = context['config']
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
+    subtotal = booking.total_price; tax = subtotal * 0.10; total = subtotal + tax; bal = total - booking.deposit_amount
+    return templates.TemplateResponse("invoice.html", {"request": request, "config": config, "booking": booking, "subtotal": subtotal, "tax": tax, "total": total, "balance": bal, "now": datetime.now()})
 
 @app.post("/app/{extension}/admin/delete_booking")
 def delete_booking(request: Request, extension: str, booking_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == context['config'].id).first()
     if booking:
-        log_activity(db, context['config'].id, context['user'].username, "Delete Booking", booking.booking_code, f"Guest: {booking.guest_name}")
+        log_activity(db, context['config'].id, context['user'].username, "Delete Booking", booking.booking_code, "Permanently Deleted")
         db.delete(booking); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#bookings", status_code=303)
 
 @app.post("/app/{extension}/admin/update_cleaning_status")
 def update_cleaning_status(extension: str, unit_id: int = Form(...), status: str = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
-    # This route is technically deprecated by V23 but kept for backward safety
-    return RedirectResponse(f"/app/{extension}/admin", status_code=303)
+    unit = db.query(models.RoomUnit).filter(models.RoomUnit.id == unit_id).first()
+    if unit and unit.room_type.site_config_id == context['config'].id:
+        unit.cleaning_status = status; db.commit()
+    return RedirectResponse(f"/app/{extension}/admin#housekeeping", status_code=303)
 
 @app.post("/app/{extension}/admin/change_password")
 def change_password(extension: str, new_password: str = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
-    user = context['user']; user.password_hash = pwd_context.hash(new_password);
-    log_activity(db, context['config'].id, user.username, "Security", "Self Password", "Password updated")
-    db.commit()
+    user = context['user']; user.password_hash = pwd_context.hash(new_password); db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Password+Changed#site", status_code=303)
 
 @app.post("/app/{extension}/admin/change_staff_password")
@@ -489,55 +523,51 @@ def edit_room_page(request: Request, extension: str, room_id: int, context: dict
     return templates.TemplateResponse("edit_room.html", {"request": request, "config": config, "room": room, "current_labels": current_labels})
 
 @app.post("/app/{extension}/admin/edit_room/{room_id}")
-def edit_room_action(request: Request, extension: str, room_id: int, name: str = Form(...), price: float = Form(...), qty: int = Form(...), desc: str = Form(""), capacity: int = Form(...), custom_labels: str = Form(""), new_images: List[UploadFile] = File(None), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
+async def edit_room_action(request: Request, extension: str, room_id: int, name: str = Form(...), price: float = Form(...), qty: int = Form(...), desc: str = Form(""), capacity: int = Form(...), custom_labels: str = Form(""), new_images: List[UploadFile] = File(None), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == config.id).first()
-    
-    changes = []
-    if room.name != name: changes.append(f"Name {room.name}->{name}")
-    if room.price_per_night != price: changes.append(f"Price {room.price_per_night}->{price}")
-    
     room.name = name; room.price_per_night = price; room.total_quantity = qty; room.description = desc; room.capacity = capacity
     
+    # Sync Units
     raw_labels = [l.strip() for l in custom_labels.split(',') if l.strip()]
     existing_units = db.query(models.RoomUnit).filter(models.RoomUnit.room_type_id == room.id).order_by(models.RoomUnit.id).all()
     for i in range(qty):
         lbl = raw_labels[i] if i < len(raw_labels) else f"{name} #{i+1}"
         if i < len(existing_units): existing_units[i].label = lbl
         else: db.add(models.RoomUnit(room_type_id=room.id, label=lbl))
+    # Remove excess
     if len(existing_units) > qty:
         for i in range(qty, len(existing_units)): db.delete(existing_units[i])
         
     if new_images:
-        count = 0
         for img in new_images:
             if img.filename:
                 path = f"static/uploads/room_{room.id}_{uuid.uuid4().hex[:6]}.jpg"
-                content = img.file.read(); i = Image.open(io.BytesIO(content))
-                if i.mode != 'RGB': i = i.convert('RGB')
-                i.thumbnail((250, 250)); i.save(path, quality=85)
+                await validate_and_save_image(img, path, "room")
                 db.add(models.RoomImage(room_id=room.id, image_url=f"/{path}"))
-                count += 1
-        if count > 0: changes.append(f"Added {count} photos")
     
-    log_activity(db, config.id, context['user'].username, "Update Room", room.name, ", ".join(changes))
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#rooms", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_room_image")
 def delete_room_image(extension: str, img_id: int = Form(...), room_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     img = db.query(models.RoomImage).filter(models.RoomImage.id == img_id).first()
-    if img and img.room.site_config_id == context['config'].id:
-        log_activity(db, context['config'].id, context['user'].username, "Delete Room Photo", img.room.name, f"Image ID {img_id}")
-        db.delete(img); db.commit()
+    if img and img.room.site_config_id == context['config'].id: db.delete(img); db.commit()
     return RedirectResponse(f"/app/{extension}/admin/edit_room/{room_id}", status_code=303)
+
+# ========================================================
+# USER MANAGEMENT ROUTES
+# ========================================================
 
 @app.post("/app/{extension}/admin/add_user")
 def add_user(extension: str, username: str = Form(...), password: str = Form(...), role: str = Form("staff"), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     if context['user'].role != 'admin' and context['user'].role != 'owner': return "Unauthorized"
     config = context['config']
+    
+    # Check existing
     existing = db.query(models.User).filter(models.User.username == username, models.User.site_config_id == config.id).first()
     if existing: return RedirectResponse(f"/app/{extension}/admin?error=User+Exists#users", status_code=303)
+    
     new_user = models.User(site_config_id=config.id, username=username, password_hash=pwd_context.hash(password), role=role)
     db.add(new_user)
     log_activity(db, config.id, context['user'].username, "Create User", username, f"Role: {role}")
@@ -549,7 +579,6 @@ def delete_user(extension: str, user_id: int = Form(...), context: dict = Depend
     if context['user'].role != 'admin' and context['user'].role != 'owner': return "Unauthorized"
     user_to_delete = db.query(models.User).filter(models.User.id == user_id, models.User.site_config_id == context['config'].id).first()
     if user_to_delete:
-        log_activity(db, context['config'].id, context['user'].username, "Delete User", user_to_delete.username, "User removed")
         db.delete(user_to_delete)
         db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=User+Deleted#users", status_code=303)
@@ -560,7 +589,6 @@ def update_user_password(extension: str, user_id: int = Form(...), new_password:
     user_to_update = db.query(models.User).filter(models.User.id == user_id, models.User.site_config_id == context['config'].id).first()
     if user_to_update:
         user_to_update.password_hash = pwd_context.hash(new_password)
-        log_activity(db, context['config'].id, context['user'].username, "Update User Password", user_to_update.username, "Password changed by admin")
         db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Password+Updated#users", status_code=303)
 
