@@ -1,0 +1,170 @@
+{% extends "base_public.html" %}
+{% block content %}
+{% if hero_images %}
+<div id="heroCarousel" class="carousel slide" data-bs-ride="carousel">
+    <div class="carousel-inner">
+        {% for img in hero_images %}
+        <div class="carousel-item {% if loop.first %}active{% endif %}">
+            <div class="hero-layout">
+                <img src="{{ img.image_url }}" class="hero-img">
+                <div class="hero-content">
+                    <h1 class="hero-title">{{ config.hotel_name }}</h1>
+                    <p class="hero-desc">{{ config.highlights }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
+    <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+</div>
+{% else %}
+<div class="container section-padding text-center"><h1>{{ config.hotel_name }}</h1><p>Welcome!</p></div>
+{% endif %}
+
+<div class="search-section">
+    <div class="container">
+        <form action="/app/{{ config.extension }}/search" method="post" class="search-card">
+            <div class="row align-items-end g-3">
+                <div class="col-md-3">
+                    <label class="fw-bold mb-1">Check-In</label>
+                    <input type="date" name="check_in" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="fw-bold mb-1">Check-Out</label>
+                    <input type="date" name="check_out" class="form-control" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="fw-bold mb-1">Guests</label>
+                    <input type="number" name="guests" value="1" class="form-control">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn-warning-custom">Check Availability</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="section-padding">
+    <div class="container">
+        <div class="content-card">
+            <div class="card-body-custom">
+                <h3 class="section-title text-start mb-4">Availability Outlook</h3>
+                <div id='calendar'></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section-padding">
+    <div class="container">
+        <div class="text-center mb-5"><h2 class="section-title">Our Accommodations</h2></div>
+        <div class="row">
+            {% for room in rooms %}
+            <div class="col-md-4 card-spacer">
+                <div class="content-card h-100">
+                    <div id="cRoom{{ room.id }}" class="carousel slide" data-bs-interval="false">
+                        <div class="carousel-inner room-card-img-container">
+                            {% if room.images %}
+                                {% for img in room.images %}
+                                <div class="carousel-item {% if loop.first %}active{% endif %} h-100">
+                                    <img src="{{ img.image_url }}" class="room-img">
+                                </div>
+                                {% endfor %}
+                            {% else %}
+                                <div class="carousel-item active h-100">
+                                    <img src="https://via.placeholder.com/400x250?text=No+Image" class="room-img">
+                                </div>
+                            {% endif %}
+                        </div>
+                        {% if room.images|length > 1 %}
+                        <button class="carousel-control-prev" type="button" data-bs-target="#cRoom{{ room.id }}" data-bs-slide="prev"><span class="carousel-control-prev-icon"></span></button>
+                        <button class="carousel-control-next" type="button" data-bs-target="#cRoom{{ room.id }}" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="card-body-custom d-flex flex-column">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h5 class="mb-0 fw-bold">{{ room.name }}</h5>
+                            <span class="badge bg-secondary"><i class="bi bi-people"></i> {{ room.capacity }}</span>
+                        </div>
+                        <p class="text-muted small flex-grow-1">{{ room.description|truncate(100) }}</p>
+                        <div class="price-tag mt-2">${{ room.price_per_night }} <small style="font-size: 0.6em; color: #777; font-weight: normal;">/night</small></div>
+                    </div>
+                    <div class="card-footer-custom">
+                        <a href="/app/{{ config.extension }}/book/{{ room.id }}" class="btn-primary-custom">View Details & Book</a>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="col-12 text-center text-muted">No rooms available yet.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="section-padding" style="background-color: rgba(0,0,0,0.02);">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-8">
+                <h3 class="section-title text-start">About Us</h3>
+                <p class="lead">{{ config.about_description }}</p>
+                
+                {% if config.rules %}
+                <hr class="my-4">
+                <h4 class="mb-3">House Rules</h4>
+                <div class="p-3 bg-white border rounded">
+                    <p class="mb-0" style="white-space: pre-line;">{{ config.rules }}</p>
+                </div>
+                {% endif %}
+
+                <hr class="my-4">
+                <h4>Amenities</h4>
+                <div class="row mt-3">
+                    {% for am in config.amenities_list.split('\n') %}
+                    {% if am.strip() %}
+                    <div class="col-md-6 mb-2 d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill icon-success me-2"></i> {{ am }}
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="content-card">
+                    <div class="card-body-custom">
+                        <h5>Contact Us</h5>
+                        <ul class="list-unstyled mt-3">
+                            <li class="mb-2"><i class="bi bi-geo-alt-fill text-highlight"></i> {{ config.address }}</li>
+                            <li class="mb-2"><i class="bi bi-envelope-fill text-highlight"></i> {{ config.contact_email }}</li>
+                            <li class="mb-2"><i class="bi bi-telephone-fill text-highlight"></i> {{ config.contact_phone }}</li>
+                        </ul>
+                        {% if config.map_url %}
+                        <div class="mt-3">
+                            <div class="ratio ratio-1x1 border rounded" style="overflow:hidden;">
+                                <iframe src="{{ config.map_url }}" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            height: 'auto',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            events: '/api/calendar_events'
+        });
+        calendar.render();
+    });
+</script>
+{% endblock %}

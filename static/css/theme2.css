@@ -1,0 +1,45 @@
+
+/* Theme 2: Sunset Luxury (Cinematic Moving Photos) */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Lato:wght@300;400&display=swap');
+:root { --primary: #2c3e50; --accent: #d4af37; --bg-color: #f4f4f4; --card-bg: #ffffff; }
+body { font-family: 'Lato', sans-serif; background-color: var(--bg-color); color: #333; }
+h1, h2, h3, h4, h5, .navbar-brand { font-family: 'Playfair Display', serif; }
+
+/* HERO LAYOUT - CINEMATIC ZOOM */
+.hero-layout { position: relative; height: 600px; width: 100%; overflow: hidden; background: #000; }
+.hero-img { 
+    width: 100%; height: 100%; object-fit: cover; opacity: 0.8; 
+    animation: kenburns 20s infinite alternate; /* THE MOVING EFFECT */
+}
+@keyframes kenburns {
+    0% { transform: scale(1) translate(0, 0); }
+    100% { transform: scale(1.15) translate(-2%, -2%); }
+}
+.hero-content { 
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+    text-align: center; color: white; z-index: 10;
+    border-top: 2px solid var(--accent); border-bottom: 2px solid var(--accent);
+    padding: 2rem; background: rgba(20, 20, 20, 0.6); backdrop-filter: blur(2px);
+}
+.hero-title { font-size: 4rem; letter-spacing: 2px; color: var(--accent); text-transform: uppercase; }
+.hero-desc { font-size: 1.5rem; font-style: italic; }
+
+/* ROOM CARDS - ELEGANT */
+.room-card-img-container { height: 300px; position: relative; }
+.room-img { width: 100%; height: 100%; object-fit: cover; filter: sepia(0.2); transition: 0.5s; }
+.content-card:hover .room-img { filter: none; }
+.content-card { border: none; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+.card-footer-custom { padding: 1.5rem; background: white; text-align: center; }
+.btn-primary-custom { background-color: var(--primary); color: var(--accent); border: 1px solid var(--primary); padding: 12px 30px; text-transform: uppercase; letter-spacing: 1px; transition: 0.3s; text-decoration: none; display: inline-block; }
+.btn-primary-custom:hover { background-color: var(--accent); color: var(--primary); border-color: var(--accent); }
+
+/* OTHER */
+.hotel-navbar { background-color: var(--primary); border-bottom: 3px solid var(--accent); padding: 1rem 0; }
+.hotel-navbar .navbar-brand { color: var(--accent) !important; font-size: 1.8rem; }
+.hotel-navbar .nav-link { color: #ecf0f1 !important; text-transform: uppercase; letter-spacing: 1px; font-size: 0.9rem; }
+.search-section { background-color: var(--primary); padding: 3rem 0; border-bottom: 1px solid var(--accent); color: var(--accent); }
+.search-card { background: transparent; }
+.search-card label { text-transform: uppercase; letter-spacing: 1px; font-size: 0.8rem; }
+.search-card input { background: rgba(255,255,255,0.1); border: 1px solid #555; color: white; }
+.hotel-footer { background-color: #1a252f; color: #bdc3c7; padding: 5rem 0; border-top: 5px solid var(--accent); margin-top: 5rem; text-align: center; }
+.footer-link { color: var(--accent); }

@@ -1,0 +1,50 @@
+
+/* Theme 3: Tropical Vibes (Side-by-Side Split) */
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
+:root { --teal: #009688; --orange: #ff7043; --sand: #fff3e0; --white: #ffffff; }
+body { font-family: 'Poppins', sans-serif; background-color: var(--sand); color: #4e342e; }
+
+/* HERO LAYOUT - SPLIT SCREEN (Image Left, Text Right) */
+.hero-layout { 
+    display: flex; 
+    align-items: center; 
+    height: 550px; 
+    background: var(--sand);
+}
+.hero-img { 
+    width: 65%; 
+    height: 100%; 
+    object-fit: cover; 
+    clip-path: polygon(0 0, 100% 0, 85% 100%, 0% 100%); /* Diagonal Cut */
+}
+.hero-content { 
+    width: 35%; 
+    padding: 3rem; 
+    text-align: left; 
+    color: var(--teal);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+.hero-title { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 1rem; text-transform: lowercase; }
+.hero-desc { font-size: 1.2rem; color: #666; border-left: 5px solid var(--orange); padding-left: 15px; }
+
+/* ROOM CARDS - ROUNDED & POPPY */
+.room-card-img-container { height: 220px; padding: 10px; }
+.room-img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; transition: transform 0.3s; }
+.content-card:hover .room-img { transform: rotate(2deg) scale(1.05); }
+.content-card { background: white; border: none; border-radius: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); overflow: hidden; }
+.card-body-custom { padding: 1.5rem; }
+.btn-primary-custom { background-color: var(--orange); color: white; padding: 10px 25px; border-radius: 50px; text-decoration: none; display: block; text-align: center; font-weight: 600; box-shadow: 0 4px 0 #bf5f3c; transition: 0.1s; }
+.btn-primary-custom:active { transform: translateY(4px); box-shadow: none; }
+
+/* OTHER */
+.hotel-navbar { background-color: var(--teal); border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; padding: 1rem 0; box-shadow: 0 4px 15px rgba(0,150,136,0.2); }
+.hotel-navbar .navbar-brand { font-weight: 800; font-size: 1.6rem; color: white !important; }
+.hotel-navbar .nav-link { color: rgba(255,255,255,0.9) !important; font-weight: 600; }
+.search-section { margin-top: -50px; position: relative; z-index: 10; padding: 0 2rem; }
+.search-card { background: white; padding: 2rem; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+.hotel-footer { background-color: #00695c; color: #b2dfdb; padding: 4rem 0; margin-top: 4rem; border-top-left-radius: 50px; border-top-right-radius: 50px; }
+.footer-link { color: white; opacity: 0.8; }
+.section-title { color: var(--teal); font-weight: 800; font-size: 2.2rem; }
+.price-tag { color: var(--orange); font-weight: 800; font-size: 1.5rem; }

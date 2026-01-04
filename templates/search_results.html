@@ -1,0 +1,38 @@
+{% extends "base_public.html" %}
+{% block content %}
+<div class="page-header">
+    <div class="container">
+        <h2>Availability Results</h2>
+        <p class="mb-0">{{ check_in }} to {{ check_out }} ({{ guests }} Guests)</p>
+    </div>
+</div>
+
+<div class="container section-padding">
+    {% if rooms %}
+    <div class="row">
+        {% for r in rooms %}
+        <div class="col-md-4 card-spacer">
+            <div class="content-card">
+                {% if r.images %}<img src="{{ r.images[0].image_url }}" class="room-img">{% endif %}
+                <div class="card-body-custom">
+                    <h5>{{ r.name }}</h5>
+                    <p class="small text-muted">{{ r.description }}</p>
+                    <div class="price-tag mb-2">${{ r.dynamic_total }} <small style="font-size: 0.8rem; color: #666;">Total</small></div>
+                    <div class="icon-success small fw-bold"><i class="bi bi-check-circle"></i> {{ r.available_now }} rooms left</div>
+                </div>
+                <div class="card-footer-custom">
+                    <a href="/app/{{ config.extension }}/book/{{ r.id }}?check_in={{ check_in }}&check_out={{ check_out }}" class="btn-primary-custom">Select Room</a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert-box alert-warning-custom text-center">
+        <h4>No rooms available</h4>
+        <p>Please try different dates or fewer guests.</p>
+        <a href="/app/{{ config.extension }}" class="btn-secondary-custom mt-3">Search Again</a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

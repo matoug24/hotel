@@ -1,0 +1,26 @@
+{% extends "base_public.html" %}
+{% block content %}
+<div class="container section-padding text-center">
+    <div class="content-card" style="max-width: 800px; margin: 0 auto;">
+        <div class="card-body-custom">
+            <div class="display-1 icon-success mb-3"><i class="bi bi-check-circle-fill"></i></div>
+            <h2 class="section-title mb-3">Booking Confirmed!</h2>
+            <p class="lead">Thank you, <strong>{{ bookings[0].guest_name }}</strong>.</p>
+            
+            <div class="d-inline-block text-start p-4 rounded bg-light border mt-3 mb-4">
+                <p class="mb-1"><strong>Ref Code:</strong> {{ bookings[0].booking_code }}</p>
+                <p class="mb-1"><strong>Dates:</strong> {{ bookings[0].check_in.date() }} to {{ bookings[0].check_out.date() }}</p>
+                <p class="mb-0 text-highlight fs-5 fw-bold"><strong>Total:</strong> ${{ total_cost }}</p>
+            </div>
+            
+            <div class="alert-box alert-warning-custom mx-auto" style="max-width: 600px;">
+                <strong>Next Steps:</strong><br>
+                {{ config.booking_success_message }}
+            </div>
+            
+            <br>
+            <a href="/app/{{ config.extension }}" class="btn-primary-custom" style="max-width: 200px; margin: 0 auto;">Return Home</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

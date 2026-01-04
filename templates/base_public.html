@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ config.hotel_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <link rel="stylesheet" href="/static/css/theme{{ config.theme_id }}.css">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg hotel-navbar sticky-top">
+        <div class="container">
+            <a class="navbar-brand" href="/app/{{ config.extension }}">
+                <i class="bi bi-building"></i> {{ config.hotel_name }}
+            </a>
+        </div>
+    </nav>
+
+    {% block content %}{% endblock %}
+
+    <footer class="hotel-footer">
+        <div class="container">
+            <div class="row">
+                <div class="col-md-4 mb-3">
+                    <h5>{{ config.hotel_name }}</h5>
+                    <p>{{ config.address }}</p>
+                </div>
+                <div class="col-md-4 mb-3 text-center">
+                    <p class="small">© 2025 {{ config.hotel_name }}</p>
+                    <div class="d-flex justify-content-center gap-3">
+                        {% if config.facebook and config.facebook != '#' %}<a href="{{ config.facebook }}" target="_blank" class="footer-link"><i class="bi bi-facebook fs-4"></i></a>{% endif %}
+                        {% if config.instagram and config.instagram != '#' %}<a href="{{ config.instagram }}" target="_blank" class="footer-link"><i class="bi bi-instagram fs-4"></i></a>{% endif %}
+                        {% if config.youtube and config.youtube != '#' %}<a href="{{ config.youtube }}" target="_blank" class="footer-link"><i class="bi bi-youtube fs-4"></i></a>{% endif %}
+                    </div>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="/app/{{ config.extension }}/admin" class="footer-link small">Staff Login</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

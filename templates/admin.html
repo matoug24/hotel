@@ -1,0 +1,339 @@
+{% extends "base_admin.html" %}
+{% block content %}
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 text-dark">{{ config.hotel_name }} Console</h1>
+            <small class="text-muted">User: {{ user.username }}</small>
+        </div>
+        <div>
+            <a href="/app/{{ config.extension }}" class="btn btn-outline-primary me-2" target="_blank">View Site</a>
+            <a href="/logout?target_path=/app/{{ config.extension }}/admin" class="btn btn-outline-danger" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+    
+    {% if msg %}<div class="alert alert-success">{{ msg }}</div>{% endif %}
+    {% if err %}<div class="alert alert-danger">{{ err }}</div>{% endif %}
+
+    <ul class="nav nav-pills mb-4" id="adminTabs">
+        <li class="nav-item"><a class="nav-link active" id="tab-dashboard" data-bs-toggle="pill" href="#dashboard">Tape Chart</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-financials" data-bs-toggle="pill" href="#financials">Financials</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-bookings" data-bs-toggle="pill" href="#bookings">Bookings</a></li>
+        
+        {% if user.role == 'admin' %}
+        <li class="nav-item"><a class="nav-link" id="tab-logs" data-bs-toggle="pill" href="#logs">Logs</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-rooms" data-bs-toggle="pill" href="#rooms">Rooms</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-maintenance" data-bs-toggle="pill" href="#maintenance">Maintenance</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-seasons" data-bs-toggle="pill" href="#seasons">Pricing</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-users" data-bs-toggle="pill" href="#users">Users</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-site" data-bs-toggle="pill" href="#site">Settings</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-hero" data-bs-toggle="pill" href="#hero">Photos</a></li>
+        {% endif %}
+    </ul>
+
+    <div class="tab-content border-top pt-4">
+        <div class="tab-pane fade show active" id="dashboard">
+            <div class="row mb-4">
+                <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-primary"><div class="card-body"><h6 class="text-muted text-uppercase small">Arrivals Today</h6><h2 class="display-6">{{ checkins_today_list|length }}</h2></div></div></div>
+                <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body"><h6 class="text-muted text-uppercase small">Departures Today</h6><h2 class="display-6">{{ checkouts_today_list|length }}</h2></div></div></div>
+                <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-warning"><div class="card-body"><h6 class="text-muted text-uppercase small">Occupancy Rate</h6><h2 class="display-6">{{ stats.occupancy }}%</h2></div></div></div>
+            </div>
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between"><h5 class="mb-0">Tape Chart</h5></div>
+                <div class="card-body p-0"><div id="visualization" style="height: 500px; border: 1px solid #e0e0e0;"></div></div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="financials">
+             <div class="row mb-4">
+                <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-info"><div class="card-body"><h6 class="text-muted small">Future Deposits</h6><h3 class="text-info">${{ financials.future_deposits }}</h3></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-danger"><div class="card-body"><h6 class="text-muted small">Outstanding</h6><h3 class="text-danger">${{ financials.outstanding_balance }}</h3></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body"><h6 class="text-muted small">30-Day Revenue</h6><h3 class="text-success">${{ financials.past_30_revenue }}</h3></div></div></div>
+            </div>
+            <div class="row"><div class="col-md-8"><div class="card shadow-sm"><div class="card-header bg-white"><h5 class="mb-0">Cash Flow</h5></div><div class="card-body"><canvas id="financialChart"></canvas></div></div></div><div class="col-md-4"><div class="card shadow-sm"><div class="card-header bg-white"><h5 class="mb-0">Recent</h5></div><ul class="list-group list-group-flush">{% for b in financials.recent_bookings %}<li class="list-group-item d-flex justify-content-between"><div><strong>{{ b.guest_name }}</strong><br><small>{{ b.created_at.strftime('%Y-%m-%d') }}</small></div><div class="text-end"><span class="badge bg-light text-dark">${{ b.total_price }}</span></div></li>{% endfor %}</ul></div></div></div>
+        </div>
+
+        <div class="tab-pane fade" id="bookings">
+            <div class="d-flex justify-content-end mb-4">
+                <a href="/app/{{ config.extension }}/admin/new_booking" class="btn btn-success"><i class="bi bi-plus-lg"></i> Create New Booking</a>
+            </div>
+            
+            {% if search_results %}
+            <div class="card shadow-sm border-primary mb-4"><div class="card-header bg-primary text-white">Search Results</div><div class="card-body p-0"><table class="table table-hover mb-0"><thead class="table-light"><tr><th>Code</th><th>Guest</th><th>Check-In</th><th>Status</th><th>Action</th></tr></thead><tbody>{% for b in search_results %}<tr><td><strong>{{ b.booking_code }}</strong></td><td>{{ b.guest_name }}</td><td>{{ b.check_in.date() }}</td><td>{{ b.status }}</td><td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-outline-primary">Manage</a></td></tr>{% endfor %}</tbody></table></div></div>
+            {% endif %}
+            
+            <div class="row g-4 mb-5">
+                <div class="col-md-3">
+                    <div class="card h-100 shadow-sm border-primary">
+                        <div class="card-header bg-primary text-white d-flex justify-content-between"><span>Check-In Today</span><span class="badge bg-white text-primary">{{ checkins_today_list|length }}</span></div>
+                        <ul class="list-group list-group-flush">{% for b in checkins_today_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a><br><small class="text-muted">{{ b.room.name }}</small></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100 shadow-sm border-success">
+                        <div class="card-header bg-success text-white d-flex justify-content-between"><span>Check-Out Today</span><span class="badge bg-white text-success">{{ checkouts_today_list|length }}</span></div>
+                        <ul class="list-group list-group-flush">{% for b in checkouts_today_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a><br><small class="text-muted">{{ b.room.name }}</small></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100 shadow-sm border-info">
+                        <div class="card-header bg-info text-white d-flex justify-content-between"><span>Check-In Tomorrow</span><span class="badge bg-white text-info">{{ checkins_tomorrow_list|length }}</span></div>
+                        <ul class="list-group list-group-flush">{% for b in checkins_tomorrow_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card h-100 shadow-sm border-secondary">
+                        <div class="card-header bg-secondary text-white d-flex justify-content-between"><span>Check-Out Tomorrow</span><span class="badge bg-white text-secondary">{{ checkouts_tomorrow_list|length }}</span></div>
+                        <ul class="list-group list-group-flush">{% for b in checkouts_tomorrow_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-5">
+
+            <h4 class="mb-3 text-primary"><i class="bi bi-person-check-fill"></i> Active Guests (In House)</h4>
+            <div class="card shadow-sm mb-5">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light"><tr><th>Guest</th><th>Room / Unit</th><th>Check-Out</th><th>Balance</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for b in active_bookings %}
+                            <tr>
+                                <td><strong>{{ b.guest_name }}</strong></td>
+                                <td>{{ b.room.name }} <span class="badge bg-light text-dark border">{{ b.assigned_unit.label if b.assigned_unit else '?' }}</span></td>
+                                <td>{{ b.check_out.date() }}</td>
+                                <td class="text-danger fw-bold">${{ b.total_price - b.deposit_amount }}</td>
+                                <td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-outline-primary">Manage</a></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="5" class="text-center text-muted p-3">No guests currently checked in.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <h4 class="mb-3"><i class="bi bi-calendar-event"></i> All Upcoming Reservations</h4>
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span class="text-muted">Sorted List</span>
+                    <div class="btn-group btn-group-sm">
+                        <a href="?sort_by=check_in#bookings" class="btn btn-outline-secondary {% if sort_by == 'check_in' %}active{% endif %}">Sort Date</a>
+                        <a href="?sort_by=created#bookings" class="btn btn-outline-secondary {% if sort_by == 'created' %}active{% endif %}">Sort New</a>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-dark"><tr><th>Code</th><th>Check-In</th><th>Check-Out</th><th>Guest</th><th>Room</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
+                            <tbody>
+                                {% for b in upcoming_bookings %}
+                                <tr class="{% if b.status == 'confirmed' %}table-success{% elif b.status == 'pending' %}table-warning{% elif b.status == 'checked_in' %}table-primary{% endif %}">
+                                    <td><strong>{{ b.booking_code }}</strong></td>
+                                    <td>{{ b.check_in.date() }}</td>
+                                    <td>{{ b.check_out.date() }}</td>
+                                    <td>{{ b.guest_name }}</td>
+                                    <td>{{ b.room.name }}</td>
+                                    <td>{{ b.status|upper }}</td>
+                                    <td>${{ b.total_price }}</td>
+                                    <td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {% if user.role == 'admin' %}
+        <div class="tab-pane fade" id="logs">
+            <div class="card shadow-sm">
+                <div class="card-header bg-white"><h5 class="mb-0">Audit Logs</h5></div>
+                <div class="card-body p-0">
+                    <table class="table table-striped mb-0">
+                        <thead class="table-light"><tr><th>Time</th><th>User</th><th>Action</th><th>Target</th><th>Details</th></tr></thead>
+                        <tbody>{% for log in logs %}<tr><td class="text-muted">{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ log.user }}</td><td class="fw-bold">{{ log.action }}</td><td>{{ log.target }}</td><td>{{ log.details }}</td></tr>{% else %}<tr><td colspan="5" class="text-center p-3">No logs.</td></tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="tab-pane fade" id="maintenance">
+            <div class="row"><div class="col-md-4"><div class="card shadow-sm p-3"><h5>Block Unit</h5><form action="/app/{{ config.extension }}/admin/add_maintenance" method="post"><div class="mb-2"><label>Unit</label><select name="unit_id" class="form-select">{% for u in all_units %}<option value="{{ u.id }}">{{ u.room_type.name }} - {{ u.label }}</option>{% endfor %}</select></div><div class="mb-2"><label>Start</label><input type="date" name="start" class="form-control" required></div><div class="mb-2"><label>End</label><input type="date" name="end" class="form-control" required></div><div class="mb-2"><input type="text" name="reason" placeholder="Reason" class="form-control" required></div><button class="btn btn-danger w-100">Block</button></form></div></div><div class="col-md-8"><h5>Active Blocks</h5><table class="table table-bordered bg-white"><tr><th>Unit</th><th>Dates</th><th>Reason</th><th>Action</th></tr>{% for m in blocks %}<tr><td>{% if m.unit %}{{ m.unit.room_type.name }} - {{ m.unit.label }}{% else %}Generic{% endif %}</td><td>{{ m.start_date }} to {{ m.end_date }}</td><td>{{ m.reason }}</td><td><form action="/app/{{ config.extension }}/admin/delete_maintenance" method="post"><input type="hidden" name="block_id" value="{{ m.id }}"><button class="btn btn-sm btn-outline-danger">Unblock</button></form></td></tr>{% endfor %}</table></div></div>
+        </div>
+
+        <div class="tab-pane fade" id="rooms">
+            <div class="row"><div class="col-md-4 border-end"><div class="card shadow-sm p-3"><h4>Add Room Type</h4><form action="/app/{{ config.extension }}/admin/add_room" method="post" enctype="multipart/form-data"><div class="mb-2"><input type="text" name="name" placeholder="Name" class="form-control" required></div><div class="mb-2"><input type="number" step="0.01" name="price" placeholder="Price" class="form-control" required></div><div class="row"><div class="col-6 mb-2"><input type="number" name="qty" placeholder="Qty" class="form-control" required></div><div class="col-6 mb-2"><input type="number" name="capacity" placeholder="Cap" class="form-control" required></div></div><div class="mb-2"><label>Custom Labels (csv):</label><input type="text" name="custom_labels" class="form-control"></div><div class="mb-2"><textarea name="desc" placeholder="Desc" class="form-control" required></textarea></div><div class="mb-2"><label>Photo:</label><input type="file" name="images" class="form-control" multiple></div><button class="btn btn-primary w-100">Create</button></form></div></div><div class="col-md-8"><h4>Current Rooms</h4><ul class="list-group">{% for r in rooms %}<li class="list-group-item d-flex justify-content-between align-items-center"><div class="d-flex align-items-center">{% if r.images %}<img src="{{ r.images[0].image_url }}" style="height: 50px; width: 50px; object-fit: cover; margin-right: 10px;" class="rounded">{% endif %}<div><strong>{{ r.name }}</strong> (Cap: {{ r.capacity }} | Total: {{ r.total_quantity }})<br><small>${{ r.price_per_night }}</small></div></div><a href="/app/{{ config.extension }}/admin/edit_room/{{ r.id }}" class="btn btn-sm btn-outline-primary">Edit</a></li>{% endfor %}</ul></div></div>
+        </div>
+
+        <div class="tab-pane fade" id="seasons">
+            <div class="row">
+                <div class="col-md-4"><div class="card shadow-sm p-3">
+                    <h5>Add Season</h5>
+                    <form action="/app/{{ config.extension }}/admin/add_season" method="post">
+                        <div class="mb-2"><input type="text" name="name" placeholder="Name" class="form-control" required></div>
+                        <div class="mb-2"><label>Start</label><input type="date" name="start" class="form-control" required></div>
+                        <div class="mb-2"><label>End</label><input type="date" name="end" class="form-control" required></div>
+                        <div class="mb-2"><label>Multiplier</label><input type="number" step="0.1" name="multiplier" class="form-control" value="1.0" required></div>
+                        <div class="mb-2"><label>Room Type (Optional)</label><select name="room_type_id" class="form-select"><option value="">All Rooms</option>{% for r in rooms %}<option value="{{ r.id }}">{{ r.name }}</option>{% endfor %}</select></div>
+                        <button class="btn btn-success w-100">Save</button>
+                    </form>
+                </div></div>
+                <div class="col-md-8"><h5>Rules</h5><table class="table table-bordered bg-white"><tr><th>Name</th><th>Scope</th><th>Dates</th><th>Multiplier</th><th>Action</th></tr>{% for s in seasons %}<tr><td>{{ s.name }}</td><td>{{ s.room.name if s.room else 'Global' }}</td><td>{{ s.start_date }} to {{ s.end_date }}</td><td>x{{ s.multiplier }}</td><td><form action="/app/{{ config.extension }}/admin/delete_season" method="post"><input type="hidden" name="season_id" value="{{ s.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form></td></tr>{% endfor %}</table></div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="users">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card shadow-sm p-4">
+                        <h5>Create New Staff</h5>
+                        <form action="/app/{{ config.extension }}/admin/add_user" method="post">
+                            <div class="mb-3">
+                                <label>Username</label>
+                                <input type="text" name="username" class="form-control" required>
+                            </div>
+                            <div class="mb-3">
+                                <label>Password</label>
+                                <input type="password" name="password" class="form-control" required>
+                            </div>
+                            <button class="btn btn-success w-100">Create User</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <h5>User Management</h5>
+                    <table class="table table-bordered bg-white align-middle">
+                        <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+                        <tbody>
+                            {% for u in hotel_users %}
+                            <tr>
+                                <td>{{ u.username }}</td>
+                                <td><span class="badge bg-secondary">{{ u.role }}</span></td>
+                                <td>
+                                    <div class="d-flex gap-2">
+                                        <form action="/app/{{ config.extension }}/admin/delete_user" method="post" onsubmit="return confirm('Delete this user?');">
+                                            <input type="hidden" name="user_id" value="{{ u.id }}">
+                                            <button class="btn btn-sm btn-outline-danger">Delete</button>
+                                        </form>
+                                        <button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#pwdModal{{ u.id }}">Change Pass</button>
+                                    </div>
+
+                                    <div class="modal fade" id="pwdModal{{ u.id }}" tabindex="-1">
+                                        <div class="modal-dialog">
+                                            <form class="modal-content" action="/app/{{ config.extension }}/admin/update_user_password" method="post">
+                                                <div class="modal-header"><h5 class="modal-title">Change Password for {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+                                                <div class="modal-body">
+                                                    <input type="hidden" name="user_id" value="{{ u.id }}">
+                                                    <label>New Password</label>
+                                                    <input type="password" name="new_password" class="form-control" required>
+                                                </div>
+                                                <div class="modal-footer"><button class="btn btn-primary">Update</button></div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="site">
+             <form action="/app/{{ config.extension }}/admin/update_site" method="post">
+                <div class="card shadow-sm p-4 mb-4 bg-light border-warning"><h5 class="text-warning">Site Status</h5><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="siteActive" name="is_active" value="true" {% if config.is_active %}checked{% endif %}><label class="form-check-label fw-bold" for="siteActive">Site is Online</label></div></div>
+                <div class="row">
+                    <div class="col-md-12 mb-3"><label class="fw-bold">Website Theme</label><select name="theme_id" class="form-select"><option value="1" {% if config.theme_id == 1 %}selected{% endif %}>Standard Blue</option><option value="2" {% if config.theme_id == 2 %}selected{% endif %}>Sunset Luxury</option><option value="3" {% if config.theme_id == 3 %}selected{% endif %}>Tropical Vibes</option></select></div>
+                    <div class="col-md-6 mb-3"><label>Booking Expiration (Hours)</label><input type="number" name="booking_expiration_hours" class="form-control" value="{{ config.booking_expiration_hours }}"></div>
+                    <div class="col-md-6 mb-3"><label>Hotel Name</label><input type="text" name="hotel_name" class="form-control" value="{{ config.hotel_name }}"></div>
+                    <div class="col-md-12 mb-3"><label>Booking Success Message (shown to guest)</label><textarea name="booking_success_message" class="form-control" rows="2">{{ config.booking_success_message }}</textarea></div>
+                    <div class="col-md-12 mb-3"><label>Hero Slogan</label><input type="text" name="highlights" class="form-control" value="{{ config.highlights }}"></div>
+                    <div class="col-md-12 mb-3"><label>Main Description</label><textarea name="about_description" class="form-control" rows="3">{{ config.about_description }}</textarea></div>
+                    <div class="col-md-12 mb-3"><label>Amenities List</label><textarea name="amenities_list" class="form-control" rows="5">{{ config.amenities_list }}</textarea></div>
+                    <div class="col-md-6 mb-3"><label>Contact Email</label><input type="email" name="email" class="form-control" value="{{ config.contact_email }}"></div>
+                    <div class="col-md-6 mb-3"><label>Phone</label><input type="text" name="phone" class="form-control" value="{{ config.contact_phone }}"></div>
+                    <div class="col-md-6 mb-3"><label>Address</label><input type="text" name="address" class="form-control" value="{{ config.address }}"></div>
+                    <div class="col-md-12 mb-3"><label>Google Maps URL</label><input type="text" name="map_url" class="form-control" value="{{ config.map_url }}"></div>
+                    <div class="col-md-12 mb-3"><label>Rules</label><textarea name="rules" class="form-control" rows="3">{{ config.rules }}</textarea></div>
+                </div>
+                <button class="btn btn-primary">Update Info</button>
+            </form>
+        </div>
+        
+        <div class="tab-pane fade" id="hero">
+            <h4>Website Main Slider Photos</h4>
+            <form action="/app/{{ config.extension }}/admin/upload_hero" method="post" enctype="multipart/form-data" class="mb-4 d-flex gap-2">
+                <input type="file" name="images" class="form-control w-50" multiple required>
+                <button class="btn btn-success">Upload Photos</button>
+            </form>
+            <div class="row">
+                {% for img in hero_images %}
+                <div class="col-md-3 mb-3 text-center">
+                    <img src="{{ img.image_url }}" class="img-thumbnail" style="height: 150px; object-fit: cover;">
+                    <form action="/app/{{ config.extension }}/admin/delete_hero" method="post" class="mt-2">
+                        <input type="hidden" name="img_id" value="{{ img.id }}">
+                        <button class="btn btn-sm btn-danger">Delete</button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+    // Persistent Tab Logic
+    document.addEventListener("DOMContentLoaded", function() {
+        var hash = window.location.hash;
+        if (hash) {
+            var tabTrigger = document.querySelector(`a[href="${hash}"]`);
+            if (tabTrigger) {
+                var tab = new bootstrap.Tab(tabTrigger);
+                tab.show();
+            }
+        }
+        loadTapeChart();
+        const ctx = document.getElementById('financialChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: {{ financials.chart_labels | tojson }},
+                    datasets: [{ label: 'Cash Flow', data: {{ financials.chart_data | tojson }}, backgroundColor: 'blue' }]
+                }
+            });
+        }
+    });
+
+    function loadTapeChart() {
+        var container = document.getElementById('visualization');
+        if(!container) return;
+        container.innerHTML = ''; // Clear "Loading..."
+        fetch('/app/{{ config.extension }}/admin/api/tape_chart')
+            .then(response => response.json())
+            .then(data => {
+                container.innerHTML = '';
+                var items = new vis.DataSet(data.items);
+                var groups = new vis.DataSet(data.groups);
+                var options = {
+                    start: new Date(),
+                    end: new Date(new Date().getTime() + 1000*60*60*24*7), 
+                    editable: false, stack: false, zoomMin: 1000 * 60 * 60 * 24, zoomMax: 1000 * 60 * 60 * 24 * 31 
+                };
+                var timeline = new vis.Timeline(container, items, groups, options);
+                timeline.on('select', function (properties) {
+                    if (properties.items.length > 0) {
+                        var bookingId = properties.items[0]; 
+                        if (String(bookingId).startsWith('maint_')) return;
+                        window.location.href = '/app/{{ config.extension }}/admin/edit_booking/' + bookingId;
+                    }
+                });
+            });
+    }
+</script>
+{% endblock %}

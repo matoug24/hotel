@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Invoice #{{ booking.booking_code }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>body { background: #f9f9f9; padding: 40px; font-family: 'Helvetica', sans-serif; } .invoice-box { max-width: 800px; margin: auto; padding: 30px; border: 1px solid #eee; background: white; box-shadow: 0 0 10px rgba(0, 0, 0, 0.15); } .invoice-title { font-size: 45px; line-height: 45px; color: #333; } @media print { .no-print { display: none; } }</style>
+</head>
+<body>
+    <div class="text-center no-print mb-4"><button onclick="window.print()" class="btn btn-primary">Print</button></div>
+    <div class="invoice-box">
+        <div class="row mb-4"><div class="col-8"><h1 class="invoice-title">INVOICE</h1><strong>{{ config.hotel_name }}</strong><br>{{ config.address }}<br>{{ config.contact_phone }}</div><div class="col-4 text-end"><h4>#{{ booking.booking_code }}</h4><p>Date: {{ now.strftime('%Y-%m-%d') }}</p><span class="badge bg-success">{{ booking.status.upper() }}</span></div></div>
+        <hr>
+        <div class="row"><div class="col-6"><h5>Bill To:</h5><p><strong>{{ booking.guest_name }}</strong><br>{{ booking.guest_email }}</p></div><div class="col-6 text-end"><h5>Details:</h5><p>Check In: {{ booking.check_in.date() }}<br>Check Out: {{ booking.check_out.date() }}<br>Room: {{ booking.assigned_unit.label if booking.assigned_unit else 'Pending' }}</p></div></div>
+        <table class="table table-striped mt-4"><thead class="table-dark"><tr><th>Description</th><th class="text-end">Amount</th></tr></thead><tbody><tr><td>Room Charges</td><td class="text-end">${{ subtotal }}</td></tr><tr><td>Taxes (10%)</td><td class="text-end">${{ tax }}</td></tr><tr class="fw-bold"><td>Total</td><td class="text-end">${{ total }}</td></tr><tr><td>Deposit</td><td class="text-end text-success">-${{ booking.deposit_amount }}</td></tr><tr class="table-warning fw-bold"><td>Balance Due</td><td class="text-end">${{ balance }}</td></tr></tbody></table>
+    </div>
+</body>
+</html>
