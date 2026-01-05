@@ -10,61 +10,51 @@ from fastapi import FastAPI, Depends, Request, Form, UploadFile, File, HTTPExcep
 from fastapi.responses import HTMLResponse, RedirectResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.security import HTTPBasic, HTTPBasicCredentials
+from fastapi.security import OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 from PIL import Image
 from passlib.context import CryptContext
+from jose import JWTError, jwt
 from dotenv import load_dotenv
 
-# NEW: Rate Limiting
+# Rate Limiting
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 
-# Import from refactored database.py
 from database import engine, get_db
 import models
 
 # --- CONFIGURATION ---
-load_dotenv() # Load .env variables
+load_dotenv()
 OWNER_PASSWORD = os.getenv("OWNER_PASSWORD", "owner")
+# CRITICAL: Change this in production!
+SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 MAX_FILE_SIZE_MB = 5
 
 # --- LOGGING ---
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("hotel_app")
 
-# --- INITIALIZE DB ---
 models.Base.metadata.create_all(bind=engine)
 
-# --- RATE LIMITER ---
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
-
 app = FastAPI()
-
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(SlowAPIMiddleware)
 
-# --- SECURITY MIDDLEWARE ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.add_middleware(
-    TrustedHostMiddleware, 
-    allowed_hosts=["*"]
-)
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 LIBYA_TZ = pytz.timezone('Africa/Tripoli')
 OWNER_HASH = pwd_context.hash(OWNER_PASSWORD)
 
@@ -73,9 +63,55 @@ os.makedirs("static/css", exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
-security = HTTPBasic()
+# --- HELPER FUNCTIONS ---
+def get_current_time():
+    return datetime.now(LIBYA_TZ)
 
-def get_current_time(): return datetime.now(LIBYA_TZ)
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta: expire = datetime.utcnow() + expires_delta
+    else: expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user_token(request: Request):
+    token = request.cookies.get("access_token")
+    if not token: return None
+    if token.startswith("Bearer "): token = token.split(" ")[1]
+    return token
+
+def verify_session(request: Request, db: Session = Depends(get_db)):
+    token = get_current_user_token(request)
+    if not token: return None 
+    
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        role: str = payload.get("role")
+        config_id: int = payload.get("config_id")
+        
+        if username is None: return None
+        
+        if role == "admin_owner":
+            return {"config": None, "user": models.User(username="SiteOwner", role="admin"), "is_owner": True}
+            
+        user = db.query(models.User).filter(models.User.username == username).first()
+        if user is None: return None
+        
+        # Verify context
+        path = request.url.path
+        if "/app/" in path:
+            parts = path.split("/")
+            if len(parts) > 2:
+                ext_in_url = parts[2]
+                if user.config.extension != ext_in_url:
+                    return None 
+                    
+        return {"config": user.config, "user": user, "is_owner": False}
+        
+    except JWTError:
+        return None
 
 # --- DEPENDENCIES ---
 def get_config(extension: str, db: Session = Depends(get_db)):
@@ -83,27 +119,35 @@ def get_config(extension: str, db: Session = Depends(get_db)):
     if not config: raise HTTPException(status_code=404, detail="Hotel not found")
     return config
 
-def verify_hotel_admin(request: Request, credentials: HTTPBasicCredentials = Depends(security), db: Session = Depends(get_db)):
-    extension = request.path_params.get("extension")
-    if not extension and "_" in credentials.username:
-        parts = credentials.username.split('_')
-        if len(parts) >= 2: extension = "_".join(parts[:-1])
-    if not extension: raise HTTPException(status_code=404, detail="Could not determine hotel context")
-    config = db.query(models.SiteConfig).filter(models.SiteConfig.extension == extension).first()
-    if not config: raise HTTPException(status_code=404, detail="Hotel not found")
-    if credentials.username == "owner" and pwd_context.verify(credentials.password, OWNER_HASH):
-        return {"config": config, "user": models.User(username="SiteOwner", role="admin")}
-    user = db.query(models.User).filter(models.User.username == credentials.username, models.User.site_config_id == config.id).first()
-    if not user or not pwd_context.verify(credentials.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid credentials", headers={"WWW-Authenticate": "Basic"})
-    return {"config": config, "user": user}
+def verify_hotel_admin(request: Request, db: Session = Depends(get_db)):
+    session_data = verify_session(request, db)
+    if not session_data:
+        path = request.url.path
+        login_url = "/owner_login"
+        if "/app/" in path:
+            parts = path.split("/")
+            if len(parts) > 2:
+                login_url = f"/app/{parts[2]}/login"
+        raise HTTPException(status_code=303, headers={"Location": login_url})
+        
+    if session_data['is_owner']:
+        path = request.url.path
+        if "/app/" in path:
+            parts = path.split("/")
+            if len(parts) > 2:
+                ext = parts[2]
+                config = db.query(models.SiteConfig).filter(models.SiteConfig.extension == ext).first()
+                if config: session_data['config'] = config
+    
+    return session_data
 
-def verify_owner(credentials: HTTPBasicCredentials = Depends(security)):
-    if credentials.username != "owner" or not pwd_context.verify(credentials.password, OWNER_HASH):
-        raise HTTPException(status_code=401, detail="Invalid Owner credentials", headers={"WWW-Authenticate": "Basic"})
+def verify_owner(request: Request, db: Session = Depends(get_db)):
+    session_data = verify_session(request, db)
+    if not session_data or not session_data['is_owner']:
+         raise HTTPException(status_code=303, headers={"Location": "/owner_login"})
     return True
 
-# --- HELPERS ---
+# --- LOGGING & MATH HELPERS ---
 def log_activity(db: Session, config_id: int, user: str, action: str, target: str, details: str):
     safe_details = (details[:495] + '..') if len(details) > 500 else details
     new_log = models.AuditLog(site_config_id=config_id, timestamp=get_current_time().replace(tzinfo=None), user=user, action=action, target=target, details=safe_details)
@@ -113,57 +157,79 @@ def calculate_price(db: Session, config_id: int, room_id: int, start: datetime, 
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == config_id).first()
     total = 0.0; curr = start
     while curr < end:
-        season = db.query(models.SeasonalRate).filter(
-            models.SeasonalRate.site_config_id == config_id,
-            models.SeasonalRate.room_type_id == room_id,
-            models.SeasonalRate.start_date <= curr.date(),
-            models.SeasonalRate.end_date >= curr.date()
-        ).first()
-        if not season:
-            season = db.query(models.SeasonalRate).filter(
-                models.SeasonalRate.site_config_id == config_id,
-                models.SeasonalRate.room_type_id == None,
-                models.SeasonalRate.start_date <= curr.date(),
-                models.SeasonalRate.end_date >= curr.date()
-            ).first()
+        season = db.query(models.SeasonalRate).filter(models.SeasonalRate.site_config_id == config_id, models.SeasonalRate.room_type_id == room_id, models.SeasonalRate.start_date <= curr.date(), models.SeasonalRate.end_date >= curr.date()).first()
+        if not season: season = db.query(models.SeasonalRate).filter(models.SeasonalRate.site_config_id == config_id, models.SeasonalRate.room_type_id == None, models.SeasonalRate.start_date <= curr.date(), models.SeasonalRate.end_date >= curr.date()).first()
         price = room.price_per_night * (season.multiplier if season else 1.0)
         total += price
         curr += timedelta(days=1)
     return total * count
 
 async def validate_and_save_image(upload_file: UploadFile, destination: str, target_type: str):
-    upload_file.file.seek(0, 2)
-    file_size = upload_file.file.tell()
-    upload_file.file.seek(0)
-    if file_size > MAX_FILE_SIZE_MB * 1024 * 1024:
-        raise HTTPException(status_code=400, detail=f"File too large. Max size is {MAX_FILE_SIZE_MB}MB")
+    upload_file.file.seek(0, 2); file_size = upload_file.file.tell(); upload_file.file.seek(0)
+    if file_size > MAX_FILE_SIZE_MB * 1024 * 1024: raise HTTPException(status_code=400, detail=f"File too large. Max size is {MAX_FILE_SIZE_MB}MB")
     content = upload_file.file.read()
-    try:
-        img = Image.open(io.BytesIO(content))
-        img.verify(); img = Image.open(io.BytesIO(content))
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid image file")
+    try: img = Image.open(io.BytesIO(content)); img.verify(); img = Image.open(io.BytesIO(content))
+    except Exception: raise HTTPException(status_code=400, detail="Invalid image file")
     if img.mode != 'RGB': img = img.convert('RGB')
-    if target_type == 'hero': 
-        ar = img.width/img.height; w = int(450*ar); img = img.resize((w, 450), Image.Resampling.LANCZOS)
-    else: 
-        img.thumbnail((250, 250))
+    if target_type == 'hero': ar = img.width/img.height; w = int(450*ar); img = img.resize((w, 450), Image.Resampling.LANCZOS)
+    else: img.thumbnail((250, 250))
     img.save(destination, quality=85, optimize=True)
 
-# --- GLOBAL ROUTES ---
-@app.get("/app/{extension}/admin/logout_bypass")
-def logout_bypass(extension: str): return {"status": "logged_out"}
+# --- LOGIN ROUTES ---
+
+@app.get("/owner_login", response_class=HTMLResponse)
+def owner_login_page(request: Request):
+    return templates.TemplateResponse("login.html", {"request": request, "hotel_name": "Site Owner", "action_url": "/login_action", "context": "owner"})
+
+@app.get("/app/{extension}/login", response_class=HTMLResponse)
+def hotel_login_page(request: Request, extension: str, db: Session = Depends(get_db)):
+    config = get_config(extension, db)
+    return templates.TemplateResponse("login.html", {"request": request, "hotel_name": config.hotel_name, "action_url": "/login_action", "context": extension})
+
+@app.post("/login_action")
+def login_action(username: str = Form(...), password: str = Form(...), context: str = Form(...), db: Session = Depends(get_db)):
+    user = None
+    role = "staff"
+    config_id = None
+    
+    if context == "owner":
+        if username == "owner" and pwd_context.verify(password, OWNER_HASH):
+            role = "admin_owner"
+        else: return RedirectResponse("/owner_login?error=Invalid+Credentials", status_code=303)
+    else:
+        config = db.query(models.SiteConfig).filter(models.SiteConfig.extension == context).first()
+        if not config: return RedirectResponse(f"/app/{context}/login?error=Hotel+Not+Found", status_code=303)
+        
+        if username == "owner" and pwd_context.verify(password, OWNER_HASH):
+             role = "admin_owner"; config_id = config.id
+        else:
+            user = db.query(models.User).filter(models.User.username == username, models.User.site_config_id == config.id).first()
+            if not user or not pwd_context.verify(password, user.password_hash):
+                return RedirectResponse(f"/app/{context}/login?error=Invalid+Credentials", status_code=303)
+            role = user.role; config_id = config.id
+
+    access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(data={"sub": username, "role": role, "config_id": config_id}, expires_delta=access_token_expires)
+    
+    target = "/owner" if context == "owner" else f"/app/{context}/admin"
+    response = RedirectResponse(url=target, status_code=303)
+    response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    return response
 
 @app.get("/logout")
-def logout(target_path: Optional[str] = None):
-    redirect_to = "/"
-    poison_target = "/app/unknown/admin/logout_bypass"
-    if target_path and "/admin" in target_path:
-        parts = target_path.split('/')
-        if len(parts) > 2:
-            extension = parts[2]; poison_target = f"/app/{extension}/admin/logout_bypass"; redirect_to = f"/app/{extension}"
-    html_content = f"""<!DOCTYPE html><html><head><title>Logging Out...</title></head><body><h3 style="font-family:sans-serif; text-align:center; margin-top:20%;">Logging out...</h3><script>var target = "{poison_target}";var xhr = new XMLHttpRequest();xhr.open("GET", target, true);xhr.setRequestHeader("Authorization", "Basic " + btoa("logout:logout"));xhr.onreadystatechange = function() {{if (xhr.readyState == 4) {{window.location.href = "{redirect_to}";}}}};xhr.send();</script></body></html>"""
-    return HTMLResponse(content=html_content)
+def logout(request: Request):
+    referer = request.headers.get("referer")
+    redirect_url = "/"
+    if referer and "/app/" in referer:
+        try: redirect_url = "/app/" + referer.split("/app/")[1].split("/")[0]
+        except: pass
+    elif referer and "owner" in referer: redirect_url = "/owner_login"
+        
+    response = RedirectResponse(url=redirect_url, status_code=303)
+    response.delete_cookie("access_token")
+    return response
+
+# --- EXISTING ROUTES ---
 
 @app.get("/reset_db")
 def reset_db(db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
@@ -173,10 +239,8 @@ def reset_db(db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
     default_hash = pwd_context.hash("password123")
     config = models.SiteConfig(admin_password_hash=default_hash, booking_expiration_hours=24, highlights="Experience paradise.", about_description="Welcome.", amenities_list="Free Wi-Fi")
     db.add(config); db.commit()
-    logger.warning("DATABASE WAS RESET BY OWNER")
-    return "Database cleared & Updated! (Action logged)"
+    return "Database cleared & Updated!"
 
-# --- OWNER ROUTES ---
 @app.get("/owner", response_class=HTMLResponse)
 def owner_dashboard(request: Request, db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
     configs = db.query(models.SiteConfig).all(); msg = request.query_params.get("success")
@@ -196,7 +260,6 @@ def reset_hotel_password(config_id: int = Form(...), role: str = Form(...), db: 
     if user: user.password_hash = pwd_context.hash("ResetToday"); log_activity(db, config_id, "Owner", "Password Reset", f"{role} User", "Reset"); db.commit(); return RedirectResponse(url="/owner?success=Password+Reset", status_code=303)
     return RedirectResponse(url="/owner?error=User+Not+Found", status_code=303)
 
-# --- PUBLIC ROUTES ---
 @app.get("/app/{extension}", response_class=HTMLResponse)
 @limiter.limit("60/minute")
 def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
@@ -281,10 +344,10 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
     db.commit()
     return templates.TemplateResponse("success.html", {"request": request, "config": config, "bookings": created_bookings, "total_cost": total_all, "nights": nights})
 
-# --- ADMIN ROUTES ---
 @app.get("/app/{extension}/admin", response_class=HTMLResponse)
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
+    
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     all_units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
@@ -338,7 +401,6 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
         if m.room_unit_id: items.append({"id": f"maint_{m.id}", "group": m.room_unit_id, "content": "BLOCKED", "start": m.start_date.isoformat(), "end": m.end_date.isoformat(), "style": "background-color: black; opacity: 0.5; border-radius: 6px;", "type": "background"})
     return JSONResponse(content={"groups": groups, "items": items})
 
-# --- ADMIN CRUD ---
 @app.post("/app/{extension}/admin/update_site")
 def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), contact_email: str = Form(""), contact_phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
     if context['user'].role != 'admin': return "Unauthorized"
@@ -407,7 +469,6 @@ def edit_booking_save(request: Request, extension: str, booking_id: int, guest_n
     config = context['config']
     booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
     c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0); c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
-    
     changes = []
     if booking.status != status: changes.append(f"Status: {booking.status}->{status}")
     if booking.check_in != c_in or booking.check_out != c_out or booking.room_type_id != booking.room_type_id or booking.rooms_booked != booking.rooms_booked:
@@ -461,27 +522,26 @@ async def upload_hero(extension: str, images: List[UploadFile] = File(...), cont
 @app.post("/app/{extension}/admin/delete_hero")
 def delete_hero(extension: str, img_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     img = db.query(models.HeroImage).filter(models.HeroImage.id == img_id, models.HeroImage.site_config_id == context['config'].id).first()
-    if img: db.delete(img); db.commit()
+    if img:
+        log_activity(db, context['config'].id, context['user'].username, "Delete Photo", str(img_id), "Hero image removed")
+        db.delete(img); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#hero", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_season")
 def delete_season(extension: str, season_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     s = db.query(models.SeasonalRate).filter(models.SeasonalRate.id == season_id, models.SeasonalRate.site_config_id == context['config'].id).first()
-    if s: db.delete(s); db.commit()
+    if s:
+        log_activity(db, context['config'].id, context['user'].username, "Delete Season", s.name, f"Multiplier {s.multiplier} removed")
+        db.delete(s); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#seasons", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_maintenance")
 def delete_maintenance(extension: str, block_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     b = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.MaintenanceBlock.id == block_id, models.RoomType.site_config_id == context['config'].id).first()
-    if b: db.delete(b); db.commit()
+    if b:
+        log_activity(db, context['config'].id, context['user'].username, "Remove Block", "Unit Block", f"Reason: {b.reason}")
+        db.delete(b); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#maintenance", status_code=303)
-
-@app.get("/app/{extension}/admin/invoice/{booking_id}", response_class=HTMLResponse)
-def generate_invoice(request: Request, extension: str, booking_id: int, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
-    config = context['config']
-    booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
-    subtotal = booking.total_price; tax = subtotal * 0.10; total = subtotal + tax; bal = total - booking.deposit_amount
-    return templates.TemplateResponse("invoice.html", {"request": request, "config": config, "booking": booking, "subtotal": subtotal, "tax": tax, "total": total, "balance": bal, "now": datetime.now()})
 
 @app.post("/app/{extension}/admin/delete_booking")
 def delete_booking(request: Request, extension: str, booking_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
@@ -563,11 +623,8 @@ def delete_room_image(extension: str, img_id: int = Form(...), room_id: int = Fo
 def add_user(extension: str, username: str = Form(...), password: str = Form(...), role: str = Form("staff"), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     if context['user'].role != 'admin' and context['user'].role != 'owner': return "Unauthorized"
     config = context['config']
-    
-    # Check existing
     existing = db.query(models.User).filter(models.User.username == username, models.User.site_config_id == config.id).first()
     if existing: return RedirectResponse(f"/app/{extension}/admin?error=User+Exists#users", status_code=303)
-    
     new_user = models.User(site_config_id=config.id, username=username, password_hash=pwd_context.hash(password), role=role)
     db.add(new_user)
     log_activity(db, config.id, context['user'].username, "Create User", username, f"Role: {role}")
@@ -595,6 +652,3 @@ def update_user_password(extension: str, user_id: int = Form(...), new_password:
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
-
-
-#test

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - {{ hotel_name }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        .login-card { width: 100%; max-width: 400px; padding: 2rem; background: white; border-radius: 10px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .btn-login { width: 100%; padding: 10px; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="login-card text-center">
+        <h3 class="mb-4">{{ hotel_name }}</h3>
+        <p class="text-muted mb-4">Secure Access</p>
+        
+        <form action="{{ action_url }}" method="post">
+            <input type="hidden" name="context" value="{{ context }}">
+            <div class="mb-3 text-start">
+                <label class="form-label">Username</label>
+                <input type="text" name="username" class="form-control" required autofocus>
+            </div>
+            <div class="mb-4 text-start">
+                <label class="form-label">Password</label>
+                <input type="password" name="password" class="form-control" required>
+            </div>
+            <button class="btn btn-primary btn-login">Sign In</button>
+        </form>
+        
+        {% if request.query_params.error %}
+        <div class="alert alert-danger mt-3">{{ request.query_params.error }}</div>
+        {% endif %}
+    </div>
+</body>
+</html>
