@@ -32,7 +32,6 @@ import models
 # --- CONFIGURATION ---
 load_dotenv()
 OWNER_PASSWORD = os.getenv("OWNER_PASSWORD", "owner")
-# CRITICAL: Change this in production!
 SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -55,6 +54,7 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
 LIBYA_TZ = pytz.timezone('Africa/Tripoli')
 OWNER_HASH = pwd_context.hash(OWNER_PASSWORD)
 
@@ -292,17 +292,26 @@ def book_page(request: Request, extension: str, room_id: int, check_in: Optional
     return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room, "prefill_check_in": check_in, "prefill_check_out": check_out, "prefill_guests": guests})
 
 @app.get("/api/calendar_events")
-def get_calendar_events(room_id: int, start: str, end: str, db: Session = Depends(get_db)):
+def get_calendar_events(start: str, end: str, room_id: Optional[int] = None, db: Session = Depends(get_db)):
     start_dt = datetime.strptime(start[:10], "%Y-%m-%d"); end_dt = datetime.strptime(end[:10], "%Y-%m-%d")
-    room = db.query(models.RoomType).filter(models.RoomType.id == room_id).first()
-    if not room: return JSONResponse([])
     events = []; curr = start_dt
+    
     while curr < end_dt:
         nxt = curr + timedelta(days=1); check_time = curr + timedelta(hours=23, minutes=59)
-        booked = db.query(func.count(models.Booking.id)).filter(models.Booking.room_type_id == room_id, models.Booking.status.in_(['confirmed', 'pending']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar()
-        blocked = db.query(func.sum(models.MaintenanceBlock.qty_blocked)).filter(models.MaintenanceBlock.room_type_id == room_id, models.MaintenanceBlock.start_date <= curr.date(), models.MaintenanceBlock.end_date > curr.date()).scalar() or 0
-        remaining = room.total_quantity - booked - blocked
-        if remaining > 0: events.append({"title": f"Available", "start": curr.strftime("%Y-%m-%d"), "allDay": True, "backgroundColor": "#28a745", "display": "background"})
+        
+        if room_id:
+            room = db.query(models.RoomType).filter(models.RoomType.id == room_id).first()
+            if not room: return JSONResponse([])
+            booked = db.query(func.count(models.Booking.id)).filter(models.Booking.room_type_id == room_id, models.Booking.status.in_(['confirmed', 'pending']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar()
+            blocked = db.query(func.sum(models.MaintenanceBlock.qty_blocked)).filter(models.MaintenanceBlock.room_type_id == room_id, models.MaintenanceBlock.start_date <= curr.date(), models.MaintenanceBlock.end_date > curr.date()).scalar() or 0
+            remaining = room.total_quantity - booked - blocked
+        else:
+            total_capacity = db.query(func.sum(models.RoomType.total_quantity)).scalar() or 0
+            total_booked = db.query(func.count(models.Booking.id)).filter(models.Booking.status.in_(['confirmed', 'pending']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar() or 0
+            total_blocked = db.query(func.sum(models.MaintenanceBlock.qty_blocked)).filter(models.MaintenanceBlock.start_date <= curr.date(), models.MaintenanceBlock.end_date > curr.date()).scalar() or 0
+            remaining = total_capacity - total_booked - total_blocked
+
+        if remaining > 0: events.append({"title": "Available", "start": curr.strftime("%Y-%m-%d"), "allDay": True, "backgroundColor": "#28a745", "display": "background"})
         else: events.append({"title": "Full", "start": curr.strftime("%Y-%m-%d"), "allDay": True, "backgroundColor": "#dc3545", "display": "background"})
         curr = nxt
     return JSONResponse(events)
@@ -344,10 +353,10 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
     db.commit()
     return templates.TemplateResponse("success.html", {"request": request, "config": config, "bookings": created_bookings, "total_cost": total_all, "nights": nights})
 
+# --- ADMIN ROUTES ---
 @app.get("/app/{extension}/admin", response_class=HTMLResponse)
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
-    
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     all_units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
@@ -401,12 +410,13 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
         if m.room_unit_id: items.append({"id": f"maint_{m.id}", "group": m.room_unit_id, "content": "BLOCKED", "start": m.start_date.isoformat(), "end": m.end_date.isoformat(), "style": "background-color: black; opacity: 0.5; border-radius: 6px;", "type": "background"})
     return JSONResponse(content={"groups": groups, "items": items})
 
+# --- ADMIN CRUD ---
 @app.post("/app/{extension}/admin/update_site")
-def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), contact_email: str = Form(""), contact_phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
+def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), email: str = Form(""), phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
     if context['user'].role != 'admin': return "Unauthorized"
     config = context['config']
     config.hotel_name = hotel_name; config.highlights = highlights; config.about_description = about_description; config.amenities_list = amenities_list
-    config.contact_email = contact_email; config.contact_phone = contact_phone; config.address = address; config.map_url = map_url
+    config.contact_email = email; config.contact_phone = phone; config.address = address; config.map_url = map_url
     config.facebook = facebook; config.instagram = instagram; config.youtube = youtube; config.rules = rules; config.booking_success_message = booking_success_message
     config.theme_id = theme_id; config.booking_expiration_hours = booking_expiration_hours
     log_activity(db, config.id, "Admin", "Update Settings", "Site Config", "Settings updated")
@@ -522,26 +532,27 @@ async def upload_hero(extension: str, images: List[UploadFile] = File(...), cont
 @app.post("/app/{extension}/admin/delete_hero")
 def delete_hero(extension: str, img_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     img = db.query(models.HeroImage).filter(models.HeroImage.id == img_id, models.HeroImage.site_config_id == context['config'].id).first()
-    if img:
-        log_activity(db, context['config'].id, context['user'].username, "Delete Photo", str(img_id), "Hero image removed")
-        db.delete(img); db.commit()
+    if img: db.delete(img); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#hero", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_season")
 def delete_season(extension: str, season_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     s = db.query(models.SeasonalRate).filter(models.SeasonalRate.id == season_id, models.SeasonalRate.site_config_id == context['config'].id).first()
-    if s:
-        log_activity(db, context['config'].id, context['user'].username, "Delete Season", s.name, f"Multiplier {s.multiplier} removed")
-        db.delete(s); db.commit()
+    if s: db.delete(s); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#seasons", status_code=303)
 
 @app.post("/app/{extension}/admin/delete_maintenance")
 def delete_maintenance(extension: str, block_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     b = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.MaintenanceBlock.id == block_id, models.RoomType.site_config_id == context['config'].id).first()
-    if b:
-        log_activity(db, context['config'].id, context['user'].username, "Remove Block", "Unit Block", f"Reason: {b.reason}")
-        db.delete(b); db.commit()
+    if b: db.delete(b); db.commit()
     return RedirectResponse(f"/app/{extension}/admin#maintenance", status_code=303)
+
+@app.get("/app/{extension}/admin/invoice/{booking_id}", response_class=HTMLResponse)
+def generate_invoice(request: Request, extension: str, booking_id: int, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
+    config = context['config']
+    booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
+    subtotal = booking.total_price; tax = subtotal * 0.10; total = subtotal + tax; bal = total - booking.deposit_amount
+    return templates.TemplateResponse("invoice.html", {"request": request, "config": config, "booking": booking, "subtotal": subtotal, "tax": tax, "total": total, "balance": bal, "now": datetime.now()})
 
 @app.post("/app/{extension}/admin/delete_booking")
 def delete_booking(request: Request, extension: str, booking_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
@@ -614,10 +625,6 @@ def delete_room_image(extension: str, img_id: int = Form(...), room_id: int = Fo
     img = db.query(models.RoomImage).filter(models.RoomImage.id == img_id).first()
     if img and img.room.site_config_id == context['config'].id: db.delete(img); db.commit()
     return RedirectResponse(f"/app/{extension}/admin/edit_room/{room_id}", status_code=303)
-
-# ========================================================
-# USER MANAGEMENT ROUTES
-# ========================================================
 
 @app.post("/app/{extension}/admin/add_user")
 def add_user(extension: str, username: str = Form(...), password: str = Form(...), role: str = Form("staff"), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
