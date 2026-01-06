@@ -1,50 +1,43 @@
-
-/* Theme 3: Tropical Vibes (Side-by-Side Split) */
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;800&display=swap');
-:root { --teal: #009688; --orange: #ff7043; --sand: #fff3e0; --white: #ffffff; }
-body { font-family: 'Poppins', sans-serif; background-color: var(--sand); color: #4e342e; }
-
-/* HERO LAYOUT - SPLIT SCREEN (Image Left, Text Right) */
-.hero-layout { 
-    display: flex; 
-    align-items: center; 
-    height: 550px; 
-    background: var(--sand);
+/* THEME 3: TROPICAL VIBES */
+:root {
+    --primary-color: #1abc9c;
+    --primary-dark: #16a085;
+    --secondary-color: #7f8c8d;
+    --success-color: #2ecc71;
+    --danger-color: #e74c3c;
+    --warning-color: #f39c12;
+    --light-bg: #e8f8f5; 
+    --dark-text: #2c3e50;
+    --card-radius: 0px;
 }
-.hero-img { 
-    width: 65%; 
-    height: 100%; 
-    object-fit: cover; 
-    clip-path: polygon(0 0, 100% 0, 85% 100%, 0% 100%); /* Diagonal Cut */
-}
-.hero-content { 
-    width: 35%; 
-    padding: 3rem; 
-    text-align: left; 
-    color: var(--teal);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-.hero-title { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 1rem; text-transform: lowercase; }
-.hero-desc { font-size: 1.2rem; color: #666; border-left: 5px solid var(--orange); padding-left: 15px; }
-
-/* ROOM CARDS - ROUNDED & POPPY */
-.room-card-img-container { height: 220px; padding: 10px; }
-.room-img { width: 100%; height: 100%; object-fit: cover; border-radius: 20px; transition: transform 0.3s; }
-.content-card:hover .room-img { transform: rotate(2deg) scale(1.05); }
-.content-card { background: white; border: none; border-radius: 25px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); overflow: hidden; }
-.card-body-custom { padding: 1.5rem; }
-.btn-primary-custom { background-color: var(--orange); color: white; padding: 10px 25px; border-radius: 50px; text-decoration: none; display: block; text-align: center; font-weight: 600; box-shadow: 0 4px 0 #bf5f3c; transition: 0.1s; }
-.btn-primary-custom:active { transform: translateY(4px); box-shadow: none; }
-
-/* OTHER */
-.hotel-navbar { background-color: var(--teal); border-bottom-left-radius: 30px; border-bottom-right-radius: 30px; padding: 1rem 0; box-shadow: 0 4px 15px rgba(0,150,136,0.2); }
-.hotel-navbar .navbar-brand { font-weight: 800; font-size: 1.6rem; color: white !important; }
-.hotel-navbar .nav-link { color: rgba(255,255,255,0.9) !important; font-weight: 600; }
-.search-section { margin-top: -50px; position: relative; z-index: 10; padding: 0 2rem; }
-.search-card { background: white; padding: 2rem; border-radius: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-.hotel-footer { background-color: #00695c; color: #b2dfdb; padding: 4rem 0; margin-top: 4rem; border-top-left-radius: 50px; border-top-right-radius: 50px; }
-.footer-link { color: white; opacity: 0.8; }
-.section-title { color: var(--teal); font-weight: 800; font-size: 2.2rem; }
-.price-tag { color: var(--orange); font-weight: 800; font-size: 1.5rem; }
+body { font-family: 'Trebuchet MS', sans-serif; background-color: #f0fdfa; color: var(--dark-text); }
+#calendar { max-width: 100%; margin: 0 auto; background: white; padding: 20px; border: 1px solid #d1f2eb; font-size: 0.85rem; }
+.fc-event-title, .fc-event-main { display: none !important; }
+.fc-daygrid-day-frame { min-height: 40px !important; display: flex; align-items: center; justify-content: center; }
+.fc-scroller { overflow: hidden !important; }
+.fc-bg-event { opacity: 0.7; border-radius: 0; }
+.hero-layout { position: relative; height: 550px; background-color: #1abc9c; }
+.hero-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.9; }
+.hero-content { position: absolute; bottom: 0; left: 0; width: 100%; background: linear-gradient(to top, rgba(0,0,0,0.8), transparent); padding: 4rem 2rem 2rem; color: white; text-align: left; }
+.hero-title { font-size: 3rem; font-weight: 900; text-transform: uppercase; margin: 0; }
+.hero-desc { font-size: 1.2rem; opacity: 0.9; }
+.search-section { background-color: #16a085; padding: 1.5rem 0; margin-top: 0; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+.search-card { background: transparent; padding: 0; box-shadow: none; border-radius: 0; color: white; }
+.search-card label { color: white !important; }
+.search-card input { background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.4); color: white; }
+.search-card input:focus { background: white; color: black; }
+.content-card { background: white; border: 1px solid #d1f2eb; border-radius: 0; height: 100%; display: flex; flex-direction: column; box-shadow: 0 4px 6px rgba(26, 188, 156, 0.1); }
+.content-card:hover { border-color: var(--primary-color); box-shadow: 0 8px 15px rgba(26, 188, 156, 0.2); }
+.card-spacer { margin-bottom: 30px; }
+.room-card-img-container { height: 220px; position: relative; }
+.room-img { width: 100%; height: 100%; object-fit: cover; }
+.card-body-custom { padding: 1.5rem; flex-grow: 1; border-top: 4px solid var(--primary-color); }
+.card-footer-custom { padding: 1rem 1.5rem; background-color: #f7fcfc; }
+.price-tag { font-size: 1.5rem; font-weight: 900; color: var(--dark-text); }
+.btn-primary-custom { background-color: transparent; color: var(--primary-color); border: 2px solid var(--primary-color); padding: 8px 20px; font-weight: bold; text-transform: uppercase; text-decoration: none; display: block; text-align: center; transition: all 0.3s; }
+.btn-primary-custom:hover { background-color: var(--primary-color); color: white; }
+.btn-warning-custom { background-color: var(--warning-color) !important; color: white !important; border: none; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; }
+.section-padding { padding: 70px 0; }
+.section-title { margin-bottom: 30px; font-weight: 900; color: var(--primary-dark); text-transform: uppercase; font-size: 2rem; text-align: center; border-bottom: 2px solid var(--primary-color); display: inline-block; padding-bottom: 10px; }
+footer { background-color: #16a085; color: white; padding: 3rem 0; border-top: 5px solid #1abc9c; }
+footer a { color: #d1f2eb; text-decoration: underline; }

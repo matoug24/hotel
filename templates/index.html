@@ -1,5 +1,6 @@
 {% extends "base_public.html" %}
 {% block content %}
+
 {% if hero_images %}
 <div id="heroCarousel" class="carousel slide" data-bs-ride="carousel">
     <div class="carousel-inner">
@@ -39,7 +40,7 @@
                     <input type="number" name="guests" value="1" class="form-control">
                 </div>
                 <div class="col-md-3">
-                    <button class="btn-warning-custom">Check Availability</button>
+                    <button class="btn btn-warning w-100 btn-warning-custom shadow-sm">Check Availability</button>
                 </div>
             </div>
         </form>
@@ -52,6 +53,10 @@
             <div class="card-body-custom">
                 <h3 class="section-title text-start mb-4">Availability Outlook</h3>
                 <div id='calendar'></div>
+                <div class="mt-2 text-center small text-muted">
+                    <span class="badge" style="background-color: #28a745; opacity: 0.6;">&nbsp;&nbsp;</span> Available
+                    <span class="badge ms-2" style="background-color: #dc3545; opacity: 0.6;">&nbsp;&nbsp;</span> Full
+                </div>
             </div>
         </div>
     </div>
@@ -109,7 +114,7 @@
         <div class="row">
             <div class="col-md-8">
                 <h3 class="section-title text-start">About Us</h3>
-                <p class="lead">{{ config.about_description }}</p>
+                <p class="lead" style="white-space: pre-line;">{{ config.about_description }}</p>
                 
                 {% if config.rules %}
                 <hr class="my-4">
@@ -159,7 +164,14 @@
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
+            initialView: 'multiMonthYear', 
+            views: {
+                multiMonthYear: {
+                    type: 'multiMonthYear',
+                    duration: { months: 2 },
+                    multiMonthMaxColumns: 2
+                }
+            },
             height: 'auto',
             headerToolbar: { left: 'prev', center: 'title', right: 'next' },
             events: '/api/calendar_events'

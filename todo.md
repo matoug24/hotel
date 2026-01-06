@@ -35,4 +35,10 @@ server {
     }
 }
 
-s
+- 
+
+- remove Reset Staff password.
+- multi line in the succes message?
+ - email and phone not saved.
+ remove staff login,
+ change to 2026
