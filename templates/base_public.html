@@ -6,39 +6,60 @@
     <title>{{ config.hotel_name }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
-    <link rel="stylesheet" href="/static/css/theme{{ config.theme_id }}.css">
+    
+    <link href="/static/css/theme{{ config.theme_id if config.theme_id else 1 }}.css" rel="stylesheet">
 </head>
-<body>
-    <nav class="navbar navbar-expand-lg hotel-navbar sticky-top">
+<body class="d-flex flex-column min-vh-100">
+
+    <nav class="navbar navbar-expand-lg navbar-dark hotel-navbar sticky-top">
         <div class="container">
-            <a class="navbar-brand" href="/app/{{ config.extension }}">
-                <i class="bi bi-building"></i> {{ config.hotel_name }}
+            <a class="navbar-brand d-flex align-items-center" href="/app/{{ config.extension }}">
+                {% if logo_url %}
+                <img src="{{ logo_url }}" alt="Logo" class="navbar-logo" style="height: 50px; margin-right: 15px; border-radius: 4px;">
+                {% else %}
+                <i class="bi bi-building me-2"></i> 
+                {% endif %}
+                {{ config.hotel_name }}
             </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
+                <ul class="navbar-nav">
+                    {% if config.facebook %}<li class="nav-item"><a class="nav-link" href="{{ config.facebook }}"><i class="bi bi-facebook"></i></a></li>{% endif %}
+                    {% if config.instagram %}<li class="nav-item"><a class="nav-link" href="{{ config.instagram }}"><i class="bi bi-instagram"></i></a></li>{% endif %}
+                </ul>
+            </div>
         </div>
     </nav>
 
     {% block content %}{% endblock %}
 
-    <footer class="hotel-footer">
+    <footer class="hotel-footer mt-auto">
         <div class="container">
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <h5>{{ config.hotel_name }}</h5>
-                    <p>{{ config.address }}</p>
+            <div class="row align-items-center">
+                <div class="col-md-4 mb-3 mb-md-0 text-start">
+                    <h5 class="mb-1">{{ config.hotel_name }}</h5>
+                    <p class="mb-0 small opacity-75">{{ config.address }}</p>
                 </div>
-                <div class="col-md-4 mb-3 text-center">
-                    <p class="small">© 2026 {{ config.hotel_name }}</p>
+                
+                <div class="col-md-4 mb-3 mb-md-0 text-center">
+                    <p class="small mb-2">© 2026 {{ config.hotel_name }}</p>
                     <div class="d-flex justify-content-center gap-3">
-                        {% if config.facebook and config.facebook != '#' %}<a href="{{ config.facebook }}" target="_blank" class="footer-link"><i class="bi bi-facebook fs-4"></i></a>{% endif %}
-                        {% if config.instagram and config.instagram != '#' %}<a href="{{ config.instagram }}" target="_blank" class="footer-link"><i class="bi bi-instagram fs-4"></i></a>{% endif %}
-                        {% if config.youtube and config.youtube != '#' %}<a href="{{ config.youtube }}" target="_blank" class="footer-link"><i class="bi bi-youtube fs-4"></i></a>{% endif %}
+                        {% if config.facebook and config.facebook != '#' %}<a href="{{ config.facebook }}" target="_blank" class="footer-link"><i class="bi bi-facebook fs-5"></i></a>{% endif %}
+                        {% if config.instagram and config.instagram != '#' %}<a href="{{ config.instagram }}" target="_blank" class="footer-link"><i class="bi bi-instagram fs-5"></i></a>{% endif %}
+                        {% if config.youtube and config.youtube != '#' %}<a href="{{ config.youtube }}" target="_blank" class="footer-link"><i class="bi bi-youtube fs-5"></i></a>{% endif %}
                     </div>
                 </div>
+                
                 <div class="col-md-4 text-end">
-                    </div>
+                    <a href="/app/{{ config.extension }}/login" class="text-white text-decoration-none small opacity-50 hover-opacity-100">Admin Login</a>
+                </div>
             </div>
         </div>
     </footer>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

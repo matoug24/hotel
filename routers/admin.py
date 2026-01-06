@@ -1,5 +1,6 @@
 import uuid
 import os
+import shutil
 from fastapi import APIRouter, Depends, Request, Form, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
@@ -101,6 +102,14 @@ def update_site(extension: str, hotel_name: str = Form(...), highlights: str = F
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Settings+Updated#site", status_code=303)
 
+# --- NEW LOGO UPLOAD ---
+@router.post("/app/{extension}/admin/upload_logo")
+async def upload_logo(extension: str, logo: UploadFile = File(...), context: dict = Depends(verify_hotel_admin)):
+    file_path = f"static/uploads/{extension}_logo.png"
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(logo.file, buffer)
+    return RedirectResponse(f"/app/{extension}/admin?success=Logo+Updated#hero", status_code=303)
+
 @router.post("/app/{extension}/admin/add_user")
 def add_user(extension: str, username: str = Form(...), password: str = Form(...), role: str = Form("staff"), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     if context['user'].role != 'admin' and context['user'].role != 'owner': return "Unauthorized"
@@ -142,36 +151,18 @@ async def add_room(extension: str, name: str = Form(...), price: float = Form(..
 @router.post("/app/{extension}/admin/delete_room")
 def delete_room(extension: str, room_id: int = Form(...), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     if context['user'].role != 'admin': return "Unauthorized"
-    
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == context['config'].id).first()
     if not room: return RedirectResponse(f"/app/{extension}/admin?error=Room+Not+Found#rooms", status_code=303)
-
-    # 1. Check active/future bookings
     today = get_current_time().date()
-    active_booking = db.query(models.Booking).filter(
-        models.Booking.room_type_id == room.id,
-        models.Booking.check_out >= today,
-        models.Booking.status.in_(['confirmed', 'checked_in', 'pending'])
-    ).first()
-
-    if active_booking:
-        return RedirectResponse(f"/app/{extension}/admin?error=Cannot+Delete:+Active+Bookings+Exist#rooms", status_code=303)
-
-    # 2. Cleanup Images from Disk
+    active_booking = db.query(models.Booking).filter(models.Booking.room_type_id == room.id, models.Booking.check_out >= today, models.Booking.status.in_(['confirmed', 'checked_in', 'pending'])).first()
+    if active_booking: return RedirectResponse(f"/app/{extension}/admin?error=Cannot+Delete:+Active+Bookings+Exist#rooms", status_code=303)
     for img in room.images:
         try:
-            # image_url starts with /, remove it to get relative file path
             file_path = img.image_url.lstrip("/")
-            if os.path.exists(file_path):
-                os.remove(file_path)
-        except Exception as e:
-            print(f"Error deleting file: {e}")
-
-    # 3. Delete Record (Cascades should handle children in DB, but this is a clean delete of the parent)
-    db.delete(room)
-    log_activity(db, context['config'].id, context['user'].username, "Delete Room", room.name, "Room and assets deleted")
+            if os.path.exists(file_path): os.remove(file_path)
+        except Exception as e: print(f"Error deleting file: {e}")
+    db.delete(room); log_activity(db, context['config'].id, context['user'].username, "Delete Room", room.name, "Room and assets deleted")
     db.commit()
-    
     return RedirectResponse(f"/app/{extension}/admin?success=Room+Deleted#rooms", status_code=303)
 
 @router.post("/app/{extension}/admin/add_season")

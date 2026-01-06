@@ -185,7 +185,7 @@
                             </div>
                             <div class="d-flex gap-2">
                                 <a href="/app/{{ config.extension }}/admin/edit_room/{{ r.id }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                                <form action="/app/{{ config.extension }}/admin/delete_room" method="post" onsubmit="return confirm('Are you sure you want to delete this room type? This cannot be undone if there are no active bookings.')">
+                                <form action="/app/{{ config.extension }}/admin/delete_room" method="post" onsubmit="return confirm('Are you sure? This cannot be undone.')">
                                     <input type="hidden" name="room_id" value="{{ r.id }}">
                                     <button class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
@@ -220,14 +220,8 @@
                     <div class="card shadow-sm p-4">
                         <h5>Create New Staff</h5>
                         <form action="/app/{{ config.extension }}/admin/add_user" method="post">
-                            <div class="mb-3">
-                                <label>Username</label>
-                                <input type="text" name="username" class="form-control" required>
-                            </div>
-                            <div class="mb-3">
-                                <label>Password</label>
-                                <input type="password" name="password" class="form-control" required>
-                            </div>
+                            <div class="mb-3"><label>Username</label><input type="text" name="username" class="form-control" required></div>
+                            <div class="mb-3"><label>Password</label><input type="password" name="password" class="form-control" required></div>
                             <button class="btn btn-success w-100">Create User</button>
                         </form>
                     </div>
@@ -236,37 +230,7 @@
                     <h5>User Management</h5>
                     <table class="table table-bordered bg-white align-middle">
                         <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
-                        <tbody>
-                            {% for u in hotel_users %}
-                            <tr>
-                                <td>{{ u.username }}</td>
-                                <td><span class="badge bg-secondary">{{ u.role }}</span></td>
-                                <td>
-                                    <div class="d-flex gap-2">
-                                        <form action="/app/{{ config.extension }}/admin/delete_user" method="post" onsubmit="return confirm('Delete this user?');">
-                                            <input type="hidden" name="user_id" value="{{ u.id }}">
-                                            <button class="btn btn-sm btn-outline-danger">Delete</button>
-                                        </form>
-                                        <button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#pwdModal{{ u.id }}">Change Pass</button>
-                                    </div>
-
-                                    <div class="modal fade" id="pwdModal{{ u.id }}" tabindex="-1">
-                                        <div class="modal-dialog">
-                                            <form class="modal-content" action="/app/{{ config.extension }}/admin/update_user_password" method="post">
-                                                <div class="modal-header"><h5 class="modal-title">Change Password for {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
-                                                <div class="modal-body">
-                                                    <input type="hidden" name="user_id" value="{{ u.id }}">
-                                                    <label>New Password</label>
-                                                    <input type="password" name="new_password" class="form-control" required>
-                                                </div>
-                                                <div class="modal-footer"><button class="btn btn-primary">Update</button></div>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% endfor %}
-                        </tbody>
+                        <tbody>{% for u in hotel_users %}<tr><td>{{ u.username }}</td><td><span class="badge bg-secondary">{{ u.role }}</span></td><td><div class="d-flex gap-2"><form action="/app/{{ config.extension }}/admin/delete_user" method="post" onsubmit="return confirm('Delete this user?');"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form><button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#pwdModal{{ u.id }}">Change Pass</button></div><div class="modal fade" id="pwdModal{{ u.id }}" tabindex="-1"><div class="modal-dialog"><form class="modal-content" action="/app/{{ config.extension }}/admin/update_user_password" method="post"><div class="modal-header"><h5 class="modal-title">Change Password for {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="user_id" value="{{ u.id }}"><label>New Password</label><input type="password" name="new_password" class="form-control" required></div><div class="modal-footer"><button class="btn btn-primary">Update</button></div></form></div></div></td></tr>{% endfor %}</tbody>
                     </table>
                 </div>
             </div>
@@ -294,7 +258,18 @@
         </div>
         
         <div class="tab-pane fade" id="hero">
-            <h4>Website Main Slider Photos</h4>
+            <h4>Hotel Logo</h4>
+            <div class="card p-3 mb-4 shadow-sm bg-light">
+                <form action="/app/{{ config.extension }}/admin/upload_logo" method="post" enctype="multipart/form-data" class="d-flex gap-2 align-items-end">
+                    <div class="w-100">
+                        <label class="form-label">Upload Hotel Logo (Will be resized to 75px height)</label>
+                        <input type="file" name="logo" class="form-control" required accept="image/*">
+                    </div>
+                    <button class="btn btn-dark">Upload Logo</button>
+                </form>
+            </div>
+
+            <h4 class="mt-4">Website Main Slider Photos</h4>
             <form action="/app/{{ config.extension }}/admin/upload_hero" method="post" enctype="multipart/form-data" class="mb-4 d-flex gap-2">
                 <input type="file" name="images" class="form-control w-50" multiple required>
                 <button class="btn btn-success">Upload Photos</button>
@@ -342,7 +317,7 @@
     function loadTapeChart() {
         var container = document.getElementById('visualization');
         if(!container) return;
-        container.innerHTML = ''; // Clear "Loading..."
+        container.innerHTML = ''; 
         fetch('/app/{{ config.extension }}/admin/api/tape_chart')
             .then(response => response.json())
             .then(data => {

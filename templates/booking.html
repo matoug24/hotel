@@ -1,131 +1,133 @@
 {% extends "base_public.html" %}
 {% block content %}
-<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
-
 <div class="container section-padding">
     <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="content-card">
-                <div class="card-header-custom">
-                    Confirm Booking: {{ room.name }}
-                </div>
-                <div class="card-body-custom text-start">
-                    <div class="row mb-4">
-                        <div class="col-md-6">
-                             <div id="cBook" class="carousel slide" data-bs-ride="carousel">
-                                <div class="carousel-inner">
-                                    {% if room.images %}
-                                        {% for img in room.images %}
-                                        <div class="carousel-item {% if loop.first %}active{% endif %}">
-                                            <img src="{{ img.image_url }}" class="d-block w-100 rounded" style="height: 250px; object-fit: cover;">
-                                        </div>
-                                        {% endfor %}
-                                    {% else %}
-                                        <div class="carousel-item active"><img src="https://via.placeholder.com/400x250" class="d-block w-100 rounded"></div>
-                                    {% endif %}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <h4>{{ room.name }}</h4>
-                            <p class="text-muted">{{ room.description }}</p>
-                            <div class="price-tag">${{ room.price_per_night }} <small style="font-size:1rem; color:#777;">/night base</small></div>
-                            <p class="mt-2"><i class="bi bi-people-fill"></i> Capacity: {{ room.capacity }}</p>
-                        </div>
+        <div class="col-md-8">
+            <div class="content-card p-4">
+                <h3 class="section-title text-start mb-4">Complete Your Booking</h3>
+                
+                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded">
+                    {% if room.images %}
+                    <img src="{{ room.images[0].image_url }}" class="rounded me-3" style="width: 100px; height: 70px; object-fit: cover;">
+                    {% endif %}
+                    <div>
+                        <h5 class="mb-0">{{ room.name }}</h5>
+                        <small class="text-muted">Capacity: {{ room.capacity }} guests</small>
                     </div>
+                </div>
 
-                    {% if error %}<div class="alert-box alert-warning-custom">{{ error }}</div>{% endif %}
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form action="/app/{{ config.extension }}/book/confirm" method="post" id="bookingForm">
+                    <input type="hidden" name="room_id" value="{{ room.id }}" id="roomId">
+                    <input type="hidden" name="extension" value="{{ config.extension }}" id="extensionId">
                     
-                    <form action="/app/{{ config.extension }}/book/confirm" method="post" style="background-color: #f9f9f9; padding: 2rem; border-radius: 10px;">
-                        <h5 class="mb-3 border-bottom pb-2">Your Details</h5>
-                        <input type="hidden" name="room_id" value="{{ room.id }}" id="room_id">
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="fw-bold small text-uppercase">Check-in</label>
-                                <input type="date" name="check_in" id="check_in" class="form-control" value="{{ prefill_check_in }}" required>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="fw-bold small text-uppercase">Check-out</label>
-                                <input type="date" name="check_out" id="check_out" class="form-control" value="{{ prefill_check_out }}" required>
-                            </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Check-In</label>
+                            <input type="date" name="check_in" id="checkIn" class="form-control" value="{{ prefill_check_in }}" required>
                         </div>
-
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label class="fw-bold small text-uppercase">Rooms</label>
-                                <select name="rooms_needed" id="rooms_needed" class="form-select">
-                                    <option value="1">1</option><option value="2">2</option><option value="3">3</option>
-                                </select>
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label class="fw-bold small text-uppercase">Guests</label>
-                                <input type="number" name="guests_count" class="form-control" value="{{ prefill_guests }}" min="1" required>
-                            </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Check-Out</label>
+                            <input type="date" name="check_out" id="checkOut" class="form-control" value="{{ prefill_check_out }}" required>
                         </div>
-
-                        <div class="alert-box alert-info-custom" id="price_estimate_box" style="display:none;">
-                            <h5 class="mb-0">Total: $<span id="estimated_price">0.00</span> <small>for <span id="night_count">0</span> nights</small></h5>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="fw-bold small text-uppercase">Full Name</label>
-                            <input type="text" name="guest_name" class="form-control" placeholder="Jane Doe" required>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6 mb-3"><label class="small text-uppercase">Phone (Optional)</label><input type="text" name="guest_phone" class="form-control"></div>
-                            <div class="col-md-6 mb-3"><label class="small text-uppercase">Email (Optional)</label><input type="email" name="guest_email" class="form-control"></div>
-                        </div>
-
-                        <button type="submit" class="btn-primary-custom mt-2">Confirm Booking</button>
-                    </form>
-
-                    <div class="mt-5">
-                        <h5>Room Availability</h5>
-                        <div id='roomCalendar'></div>
                     </div>
-                </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Number of Rooms</label>
+                            <input type="number" name="rooms_needed" id="roomsNeeded" class="form-control" value="1" min="1" max="{{ room.available_now }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Total Guests</label>
+                            <input type="number" name="guests_count" class="form-control" value="{{ prefill_guests }}" min="1" required>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Full Name</label>
+                        <input type="text" name="guest_name" class="form-control" required>
+                    </div>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label">Email</label>
+                            <input type="email" name="guest_email" class="form-control">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Phone</label>
+                            <input type="text" name="guest_phone" class="form-control">
+                        </div>
+                    </div>
+
+                    <div class="bg-light p-3 rounded mb-4 text-center">
+                        <h4 class="mb-0" id="priceDisplay">Calculating...</h4>
+                        <small class="text-muted" id="nightCount">...</small>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow">Confirm Reservation</button>
+                </form>
+            </div>
+        </div>
+        
+        <div class="col-md-4">
+            <div class="content-card p-3">
+                <h5 class="mb-3">Availability for this Room</h5>
+                <div id="roomCalendar"></div>
             </div>
         </div>
     </div>
 </div>
 
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var calendar = new FullCalendar.Calendar(document.getElementById('roomCalendar'), { 
-            initialView: 'dayGridMonth', height: 400, headerToolbar: { left: 'prev', center: 'title', right: 'next' },
-            events: '/api/calendar_events?room_id={{ room.id }}' 
+        // 1. Setup Calendar for specific room
+        var calendarEl = document.getElementById('roomCalendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            height: 'auto',
+            headerToolbar: { left: 'prev', center: 'title', right: 'next' },
+            events: '/api/calendar_events?room_id={{ room.id }}'
         });
         calendar.render();
-        
-        const checkInEl = document.getElementById('check_in');
-        const checkOutEl = document.getElementById('check_out');
-        const roomsEl = document.getElementById('rooms_needed');
-        const estimateBox = document.getElementById('price_estimate_box');
-        const priceSpan = document.getElementById('estimated_price');
-        const nightsSpan = document.getElementById('night_count');
 
-        async function updatePrice() {
-            if(checkInEl.value && checkOutEl.value) {
-                const formData = new FormData();
-                formData.append('room_id', document.getElementById('room_id').value);
-                formData.append('check_in', checkInEl.value);
-                formData.append('check_out', checkOutEl.value);
-                formData.append('rooms_needed', roomsEl.value);
-                try {
-                    const response = await fetch('/app/{{ config.extension }}/api/calculate_price', { method: 'POST', body: formData });
-                    const data = await response.json();
-                    if(data.total) {
-                        priceSpan.innerText = data.total;
-                        nightsSpan.innerText = data.nights;
-                        estimateBox.style.display = 'block';
+        // 2. Live Price Calc
+        const checkInEl = document.getElementById('checkIn');
+        const checkOutEl = document.getElementById('checkOut');
+        const roomsEl = document.getElementById('roomsNeeded');
+        const priceDisplay = document.getElementById('priceDisplay');
+        const nightCount = document.getElementById('nightCount');
+        const roomId = document.getElementById('roomId').value;
+        const extension = document.getElementById('extensionId').value;
+
+        function updatePrice() {
+            const fd = new FormData();
+            fd.append('room_id', roomId);
+            fd.append('check_in', checkInEl.value);
+            fd.append('check_out', checkOutEl.value);
+            fd.append('rooms_needed', roomsEl.value);
+
+            fetch(`/app/${extension}/api/calculate_price`, { method: 'POST', body: fd })
+                .then(r => r.json())
+                .then(data => {
+                    if(data.error) {
+                        priceDisplay.innerText = "Invalid Dates";
+                        priceDisplay.className = "text-danger fw-bold";
+                        nightCount.innerText = "";
+                    } else {
+                        priceDisplay.innerText = "$" + data.total.toFixed(2);
+                        priceDisplay.className = "text-success fw-bold display-6";
+                        nightCount.innerText = `${data.nights} Nights | ${roomsEl.value} Room(s)`;
                     }
-                } catch(e) {}
-            }
+                });
         }
+
         checkInEl.addEventListener('change', updatePrice);
         checkOutEl.addEventListener('change', updatePrice);
         roomsEl.addEventListener('change', updatePrice);
+        updatePrice(); // Run once on load
     });
 </script>
 {% endblock %}
