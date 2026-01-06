@@ -1,22 +1,76 @@
 {% extends "base_admin.html" %}
 {% block content %}
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3"><h2>Edit Room: {{ room.name }}</h2><a href="/admin" class="btn btn-secondary">Back to Dashboard</a></div>
-    <div class="card p-4 shadow-sm mb-4">
-        <form action="/admin/edit_room/{{ room.id }}" method="post" enctype="multipart/form-data">
-            <div class="row">
-                <div class="col-md-6 mb-3"><label>Name</label><input type="text" name="name" value="{{ room.name }}" class="form-control"></div>
-                <div class="col-md-3 mb-3"><label>Price</label><input type="number" step="0.01" name="price" value="{{ room.price_per_night }}" class="form-control"></div>
-                <div class="col-md-3 mb-3"><label>Total Quantity</label><input type="number" name="qty" value="{{ room.total_quantity }}" class="form-control"></div>
-                <div class="col-md-12 mb-3"><label>Custom Labels (comma separated)</label><input type="text" name="custom_labels" value="{{ current_labels }}" class="form-control"></div>
-                <div class="col-md-12 mb-3"><label>Max People (Capacity)</label><input type="number" name="capacity" value="{{ room.capacity }}" class="form-control"></div>
-                <div class="col-md-12 mb-3"><label>Description</label><textarea name="desc" class="form-control" rows="3">{{ room.description }}</textarea></div>
-                <div class="col-md-12 mb-3"><label class="form-label fw-bold">Add More Photos:</label><input type="file" name="new_images" class="form-control" multiple></div>
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+            <h3 class="mb-0">Edit Room: {{ room.name }}</h3>
+            <a href="/app/{{ config.extension }}/admin#rooms" class="btn btn-light btn-sm">Back to Dashboard</a>
+        </div>
+        <div class="card-body">
+            <form action="/app/{{ config.extension }}/admin/edit_room/{{ room.id }}" method="post" enctype="multipart/form-data">
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Room Name</label>
+                        <input type="text" name="name" class="form-control" value="{{ room.name }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Price per Night ($)</label>
+                        <input type="number" step="0.01" name="price" class="form-control" value="{{ room.price_per_night }}" required>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Total Quantity (Units)</label>
+                        <input type="number" name="qty" class="form-control" value="{{ room.total_quantity }}" required>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label class="form-label">Guest Capacity</label>
+                        <input type="number" name="capacity" class="form-control" value="{{ room.capacity }}" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Description</label>
+                    <textarea name="desc" class="form-control" rows="4" required>{{ room.description }}</textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Custom Labels (Comma separated, e.g., "101, 102, Suite A")</label>
+                    <input type="text" name="custom_labels" class="form-control" value="{{ current_labels }}">
+                    <small class="text-muted">Leave blank to auto-generate (Name #1, Name #2...)</small>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label">Upload New Photos</label>
+                    <input type="file" name="new_images" class="form-control" multiple>
+                </div>
+
+                <button type="submit" class="btn btn-success w-100 py-2 fw-bold">Save Changes</button>
+            </form>
+
+            <hr class="my-5">
+
+            <h5 class="mb-3">Current Photos</h5>
+            <div class="row g-3">
+                {% for img in room.images %}
+                <div class="col-md-3 col-6 text-center">
+                    <div class="card h-100">
+                        <img src="{{ img.image_url }}" class="card-img-top" style="height: 150px; object-fit: cover;">
+                        <div class="card-body p-2">
+                            <form action="/app/{{ config.extension }}/admin/delete_room_image" method="post">
+                                <input type="hidden" name="img_id" value="{{ img.id }}">
+                                <input type="hidden" name="room_id" value="{{ room.id }}">
+                                <button class="btn btn-danger btn-sm w-100">Delete</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <p class="text-muted">No photos uploaded for this room type.</p>
+                {% endfor %}
             </div>
-            <button class="btn btn-primary">Save Changes</button>
-        </form>
+        </div>
     </div>
-    <h4>Manage Existing Photos</h4>
-    <div class="row">{% for img in room.images %}<div class="col-md-3 mb-3 text-center"><div class="card h-100"><img src="{{ img.image_url }}" class="card-img-top" style="height: 150px; object-fit: cover;"><div class="card-body p-2"><form action="/admin/delete_room_image" method="post"><input type="hidden" name="img_id" value="{{ img.id }}"><input type="hidden" name="room_id" value="{{ room.id }}"><button class="btn btn-sm btn-danger w-100">Delete</button></form></div></div></div>{% endfor %}</div>
 </div>
 {% endblock %}

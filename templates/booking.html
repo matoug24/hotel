@@ -6,13 +6,42 @@
             <div class="content-card p-4">
                 <h3 class="section-title text-start mb-4">Complete Your Booking</h3>
                 
-                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded">
-                    {% if room.images %}
-                    <img src="{{ room.images[0].image_url }}" class="rounded me-3" style="width: 100px; height: 70px; object-fit: cover;">
-                    {% endif %}
-                    <div>
-                        <h5 class="mb-0">{{ room.name }}</h5>
-                        <small class="text-muted">Capacity: {{ room.capacity }} guests</small>
+                <div class="mb-4 bg-light rounded overflow-hidden">
+                    <div class="row g-0">
+                        <div class="col-md-5">
+                            {% if room.images %}
+                            <div id="bookingRoomCarousel" class="carousel slide h-100" data-bs-ride="carousel">
+                                <div class="carousel-inner h-100">
+                                    {% for img in room.images %}
+                                    <div class="carousel-item {% if loop.first %}active{% endif %} h-100">
+                                        <img src="{{ img.image_url }}" class="d-block w-100 h-100" style="object-fit: cover; min-height: 250px;">
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                                {% if room.images|length > 1 %}
+                                <button class="carousel-control-prev" type="button" data-bs-target="#bookingRoomCarousel" data-bs-slide="prev">
+                                    <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Previous</span>
+                                </button>
+                                <button class="carousel-control-next" type="button" data-bs-target="#bookingRoomCarousel" data-bs-slide="next">
+                                    <span class="carousel-control-next-icon" aria-hidden="true"></span>
+                                    <span class="visually-hidden">Next</span>
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% else %}
+                            <img src="https://via.placeholder.com/400x300?text=No+Image" class="w-100 h-100" style="object-fit: cover; min-height: 250px;">
+                            {% endif %}
+                        </div>
+                        
+                        <div class="col-md-7 p-4">
+                            <h4 class="fw-bold mb-2">{{ room.name }}</h4>
+                            <div class="mb-3">
+                                <span class="badge bg-secondary me-2"><i class="bi bi-people-fill"></i> Capacity: {{ room.capacity }}</span>
+                                <span class="badge bg-success"><i class="bi bi-tag-fill"></i> ${{ room.price_per_night }} / night</span>
+                            </div>
+                            <p class="text-muted small mb-0" style="white-space: pre-line;">{{ room.description }}</p>
+                        </div>
                     </div>
                 </div>
 
@@ -26,55 +55,57 @@
                     
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">Check-In</label>
+                            <label class="form-label fw-bold">Check-In</label>
                             <input type="date" name="check_in" id="checkIn" class="form-control" value="{{ prefill_check_in }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Check-Out</label>
+                            <label class="form-label fw-bold">Check-Out</label>
                             <input type="date" name="check_out" id="checkOut" class="form-control" value="{{ prefill_check_out }}" required>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label">Number of Rooms</label>
+                            <label class="form-label fw-bold">Number of Rooms</label>
                             <input type="number" name="rooms_needed" id="roomsNeeded" class="form-control" value="1" min="1" max="{{ room.available_now }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Total Guests</label>
+                            <label class="form-label fw-bold">Total Guests</label>
                             <input type="number" name="guests_count" class="form-control" value="{{ prefill_guests }}" min="1" required>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label">Full Name</label>
+                        <label class="form-label fw-bold">Full Name</label>
                         <input type="text" name="guest_name" class="form-control" required>
                     </div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label">Email</label>
+                            <label class="form-label fw-bold">Email</label>
                             <input type="email" name="guest_email" class="form-control">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label">Phone</label>
+                            <label class="form-label fw-bold">Phone</label>
                             <input type="text" name="guest_phone" class="form-control">
                         </div>
                     </div>
 
-                    <div class="bg-light p-3 rounded mb-4 text-center">
+                    <div class="bg-light p-3 rounded mb-4 text-center border">
                         <h4 class="mb-0" id="priceDisplay">Calculating...</h4>
                         <small class="text-muted" id="nightCount">...</small>
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow">Confirm Reservation</button>
+                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow-sm">Confirm Reservation</button>
                 </form>
             </div>
         </div>
         
-        <div class="col-md-4">
+        <div class="col-md-4 mt-4 mt-md-0">
             <div class="content-card p-3">
-                <h5 class="mb-3">Availability for this Room</h5>
-                <div id="roomCalendar"></div>
+                <h5 class="mb-3 text-center">Availability</h5>
+                <div id="room-calendar-container">
+                    <div id="roomCalendar"></div>
+                </div>
             </div>
         </div>
     </div>
@@ -83,7 +114,6 @@
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // 1. Setup Calendar for specific room
         var calendarEl = document.getElementById('roomCalendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
@@ -93,7 +123,6 @@
         });
         calendar.render();
 
-        // 2. Live Price Calc
         const checkInEl = document.getElementById('checkIn');
         const checkOutEl = document.getElementById('checkOut');
         const roomsEl = document.getElementById('roomsNeeded');
@@ -127,7 +156,7 @@
         checkInEl.addEventListener('change', updatePrice);
         checkOutEl.addEventListener('change', updatePrice);
         roomsEl.addEventListener('change', updatePrice);
-        updatePrice(); // Run once on load
+        updatePrice(); 
     });
 </script>
 {% endblock %}

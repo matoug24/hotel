@@ -1,0 +1,152 @@
+/* THEME 5: HISTORIC (Serif Fonts, Gold/Beige, Classic) */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
+:root {
+    --primary-color: #8b7355; /* Antique Gold/Brown */
+    --primary-dark: #5e4b35;
+    --secondary-color: #8c8c8c;
+    --success-color: #556b2f; /* Olive Green */
+    --danger-color: #8b0000; /* Dark Red */
+    --warning-color: #daa520; /* Goldenrod */
+    --light-bg: #fcfbf4; /* Cream/Paper color */
+    --dark-text: #2b2b2b;
+    --card-radius: 4px;
+}
+
+body {
+    font-family: 'Playfair Display', serif;
+    background-color: var(--light-bg);
+    color: var(--dark-text);
+    background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0IiBoZWlnaHQ9IjQiPgo8cmVjdCB3aWR0aD0iNCIgaGVpZ2h0PSI0IiBmaWxsPSIjZmNmYmY0Ii8+CjxwYXRoIGQ9Ik0xIDNoMnYxSDF6IiBmaWxsPSIjZjRmM2ViIi8+Cjwvc3ZnPg=='); /* Subtle paper texture */
+}
+
+/* NAVBAR & FOOTER */
+.hotel-navbar { background-color: #3e3226; border-bottom: 3px solid var(--primary-color); }
+.hotel-footer { background-color: #3e3226; color: #eaddcf; padding: 3rem 0; border-top: 3px solid var(--primary-color); }
+.hotel-footer a { color: var(--warning-color); text-decoration: underline; }
+
+
+/* --- V37.8 CORE LAYOUT RULES --- */
+
+/* 1. Navbar Structure */
+.hotel-navbar {
+    padding-top: 0.5rem !important;
+    padding-bottom: 0.5rem !important;
+    min-height: 60px;
+}
+
+/* 2. Search Section */
+.search-card { border-radius: 30px !important; }
+
+/* 3. CALENDAR FIXED SIDE-BY-SIDE */
+#calendar-container {
+    position: relative;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 0 60px;
+}
+#calendar {
+    /* Scaling to make it visually smaller without breaking grid */
+    transform: scale(0.9);
+    transform-origin: top center;
+    background: #fff;
+    border-radius: 20px;
+    padding: 10px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+}
+/* Force FullCalendar to put months side-by-side */
+.fc-multimonth-month {
+    display: inline-block !important;
+    width: 50% !important; 
+    vertical-align: top !important;
+    box-sizing: border-box !important;
+    padding: 0 5px !important;
+}
+.fc-multimonth-daygrid {
+    display: block !important;
+}
+
+/* Navigation Buttons */
+.fc-prev-button, .fc-next-button {
+    position: absolute !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    width: 45px !important;
+    height: 45px !important;
+    border-radius: 50% !important;
+    color: var(--primary-color) !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    z-index: 100;
+}
+.fc-prev-button { left: 0 !important; }
+.fc-next-button { right: 0 !important; }
+.fc-icon { font-size: 1.2rem !important; }
+
+/* 4. Rooms Headline Padding */
+.extra-top-padding { padding-top: 20px !important; }
+
+/* 5. Room Images */
+.room-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 15px !important;
+    padding: 5px !important; 
+    background: transparent;
+    box-sizing: border-box !important; 
+}
+
+
+/* Overrides for Classic Look */
+.fc-prev-button, .fc-next-button { background: #fcfbf4 !important; color: var(--primary-dark) !important; border: 1px solid var(--primary-color) !important; font-family: sans-serif; }
+.fc-prev-button:hover, .fc-next-button:hover { background: var(--primary-color) !important; color: #fff !important; }
+
+.hero-layout { position: relative; height: 550px; background-color: #3e3226; }
+.hero-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; filter: sepia(30%); border-bottom: 5px solid var(--primary-color); }
+
+.hero-content {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    text-align: center; color: #fcfbf4; width: 80%;
+    text-shadow: 2px 2px 0px #000;
+}
+.hero-title { font-size: 4.5rem; font-style: italic; margin-bottom: 1rem; }
+.hero-desc { font-size: 1.4rem; font-family: 'Georgia', serif; letter-spacing: 1px; }
+
+.search-section { background-color: #eaddcf; padding: 2rem 0; border-top: 1px solid #d1c4b6; border-bottom: 1px solid #d1c4b6; margin-top: -40px; position: relative; z-index: 10; }
+.search-card { background: #fff; padding: 25px; border: 1px solid #d1c4b6; box-shadow: 5px 5px 15px rgba(62, 50, 38, 0.1); border-radius: 4px !important; }
+
+.content-card {
+    background: #fff; border: 1px solid #d1c4b6; border-radius: 2px !important;
+    overflow: hidden; height: 100%; display: flex; flex-direction: column;
+    box-shadow: 3px 3px 10px rgba(0,0,0,0.05);
+}
+.content-card:hover { border-color: var(--primary-color); }
+
+/* Buttons */
+.btn-primary-custom {
+    background-color: var(--primary-color); color: #fff; border: 1px solid #5e4b35;
+    padding: 10px 25px; border-radius: 2px; text-decoration: none; display: block; text-align: center;
+    font-style: italic; letter-spacing: 1px; font-size: 1.1rem;
+}
+.btn-primary-custom:hover { background-color: var(--primary-dark); color: #eaddcf; }
+
+.btn-warning-custom {
+    background-color: var(--warning-color) !important; color: #3e3226 !important;
+    border: 1px solid #b8860b !important; font-weight: bold; border-radius: 2px !important;
+}
+
+.section-padding { padding: 80px 0; }
+.section-title {
+    margin-bottom: 50px; font-weight: normal; color: var(--primary-dark);
+    font-size: 3rem; text-align: center; font-style: italic;
+    text-decoration: underline; text-decoration-color: var(--primary-color);
+}
+
+/* Calendar Tweaks */
+#calendar { font-family: 'Georgia', serif; border: 1px solid #d1c4b6 !important; background: #fffdf5; }
+.fc-daygrid-day-frame { min-height: 35px !important; }
+.fc-bg-event { opacity: 0.6; border-radius: 50%; transform: scale(0.7); } /* Dot style availability */

@@ -1,53 +1,102 @@
-/* THEME 2: SUNSET LUXURY */
+/* THEME 2 */
 :root { --primary-color: #d35400; --primary-dark: #a04000; --secondary-color: #95a5a6; --success-color: #27ae60; --danger-color: #c0392b; --warning-color: #f1c40f; --light-bg: #fdf2e9; --dark-text: #2c3e50; --card-radius: 20px; }
 body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-color: #fffbf7; color: var(--dark-text); }
-
-/* NAVBAR & FOOTER (Dark Blue) */
 .hotel-navbar { background-color: #2c3e50; }
 .hotel-footer { background-color: #2c3e50; color: #fff; padding: 2rem 0; }
 .hotel-footer a { color: #e67e22; text-decoration: none; }
 
+/* --- V37.5 UPDATES --- */
 
-/* --- CALENDAR ARROWS --- */
-#calendar-container {
+/* 1. Slim Navbar */
+.hotel-navbar {
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
+    min-height: 50px;
+}
+
+/* 2. Search Section */
+.search-card { border-radius: 30px !important; }
+
+/* 3. CALENDAR WRAPPERS (Apply to Index AND Booking) */
+#calendar-container, #room-calendar-container {
     position: relative;
-    max-width: 700px;
     margin: 0 auto;
-    padding: 0 50px;
+    /* Create space for the floating arrows */
+    padding: 0 50px !important; 
 }
-#calendar { 
-    max-width: 600px;
-    margin: 0 auto; 
-    font-size: 0.85rem; 
+
+#calendar-container { max-width: 1000px; } /* Main Page Width Limit */
+#room-calendar-container { max-width: 100%; } /* Booking Page fits sidebar */
+
+/* SHARED CALENDAR STYLING */
+#calendar, #roomCalendar {
+    border-radius: 20px !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+    border: none !important;
     background: #fff;
-    border-radius: 8px;
+    padding: 15px;
 }
-.fc-header-toolbar { margin-bottom: 10px !important; }
-.fc-toolbar-title { font-size: 1.1rem !important; font-weight: bold; color: var(--dark-text); }
+
+/* Main Calendar Specifics (Scaling) */
+#calendar {
+    max-width: 900px !important;
+    font-size: 1rem;
+}
+
+/* Booking Calendar Specifics (Fit Sidebar) */
+#roomCalendar {
+    font-size: 0.8rem; /* Slightly smaller text for sidebar */
+}
+
+/* Force Side-by-Side Months (Only applies if space permits) */
+.fc-multimonth-month {
+    display: inline-block !important;
+    width: 50% !important;
+    vertical-align: top !important;
+    box-sizing: border-box !important;
+    padding: 0 10px !important;
+}
+.fc-multimonth-daygrid { display: block !important; }
+
+/* MODERN NAVIGATION BUTTONS (Floating Circles) */
 .fc-prev-button, .fc-next-button {
     position: absolute !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
-    z-index: 100 !important;
-    background: transparent !important;
-    border: none !important;
-    color: var(--primary-color) !important;
-    font-size: 1.5rem !important;
     width: 40px !important;
     height: 40px !important;
     border-radius: 50% !important;
+    background: #fff !important;
+    color: var(--primary-color) !important;
+    border: 1px solid rgba(0,0,0,0.1) !important;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1) !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    z-index: 100;
 }
 .fc-prev-button:hover, .fc-next-button:hover {
-    background-color: rgba(0,0,0,0.05) !important;
-    color: var(--primary-dark) !important;
+    background: var(--primary-color) !important;
+    color: white !important;
 }
+/* Move arrows into the padded area we created */
 .fc-prev-button { left: 0 !important; }
 .fc-next-button { right: 0 !important; }
-.fc-icon { font-size: 1.5em !important; }
-.fc-event-title, .fc-event-main { display: none !important; } 
+.fc-icon { font-size: 1.2rem !important; }
+
+/* 4. Rooms Padding */
+.extra-top-padding { padding-top: 20px !important; }
+
+/* 5. Room Images */
+.room-img {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    border-radius: 15px !important;
+    padding: 5px !important;
+    background: transparent;
+    box-sizing: border-box !important;
+}
 
 .hero-layout { position: relative; height: 600px; background-color: #2c3e50; }
 .hero-img { width: 100%; height: 100%; object-fit: cover; opacity: 0.8; filter: sepia(20%); }
@@ -55,13 +104,11 @@ body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; background-c
 .hero-title { font-size: 4rem; font-family: 'Georgia', serif; font-style: italic; margin-bottom: 1rem; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
 .hero-desc { font-size: 1.2rem; font-weight: 400; letter-spacing: 2px; text-transform: uppercase; }
 .search-section { background-color: white; padding: 3rem 0; border-bottom: none; margin-top: -80px; position: relative; z-index: 10; }
-.search-card { background: white; padding: 30px; border-radius: 50px; box-shadow: 0 10px 30px rgba(211, 84, 0, 0.15); border: 1px solid #fcede6; }
+.search-card { background: white; padding: 30px; box-shadow: 0 10px 30px rgba(211, 84, 0, 0.15); border: 1px solid #fcede6; }
 .content-card { background: white; border: none; border-radius: var(--card-radius); overflow: hidden; height: 100%; display: flex; flex-direction: column; box-shadow: 0 5px 15px rgba(0,0,0,0.05); transition: all 0.3s; }
 .content-card:hover { transform: translateY(-10px); box-shadow: 0 15px 30px rgba(211, 84, 0, 0.2); }
 .card-spacer { margin-bottom: 40px; }
 .room-card-img-container { height: 280px; overflow: hidden; }
-.room-img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s; }
-.content-card:hover .room-img { transform: scale(1.05); }
 .card-body-custom { padding: 2rem; flex-grow: 1; }
 .card-footer-custom { padding: 1.5rem 2rem; background-color: #fff; border-top: none; }
 .price-tag { font-size: 1.5rem; font-family: 'Georgia', serif; color: var(--primary-color); }

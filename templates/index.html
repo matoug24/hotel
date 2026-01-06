@@ -11,6 +11,9 @@
                 <div class="hero-content">
                     <h1 class="hero-title">{{ config.hotel_name }}</h1>
                     <p class="hero-desc">{{ config.highlights }}</p>
+                    <button type="button" class="btn btn-outline-light mt-3 px-4 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#allPhotosModal">
+                        <i class="bi bi-grid-3x3-gap me-2"></i> View All Photos
+                    </button>
                 </div>
             </div>
         </div>
@@ -23,7 +26,29 @@
 <div class="container section-padding text-center"><h1>{{ config.hotel_name }}</h1><p>Welcome!</p></div>
 {% endif %}
 
-<div class="search-section">
+{% if hero_images %}
+<div class="modal fade" id="allPhotosModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold">Photo Gallery</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body bg-light">
+        <div class="row g-3">
+            {% for img in hero_images %}
+            <div class="col-md-4 col-sm-6">
+                <img src="{{ img.image_url }}" class="img-fluid rounded shadow-sm w-100" style="height: 250px; object-fit: cover;">
+            </div>
+            {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<div class="search-section" id="search">
     <div class="container">
         <form action="/app/{{ config.extension }}/search" method="post" class="search-card">
             <div class="row align-items-end g-3">
@@ -52,7 +77,9 @@
         <div class="content-card">
             <div class="card-body-custom">
                 <h3 class="section-title text-start mb-4">Availability Outlook</h3>
-                <div id='calendar'></div>
+                <div id='calendar-container'>
+                    <div id='calendar'></div>
+                </div>
                 <div class="mt-2 text-center small text-muted">
                     <span class="badge" style="background-color: #28a745; opacity: 0.6;">&nbsp;&nbsp;</span> Available
                     <span class="badge ms-2" style="background-color: #dc3545; opacity: 0.6;">&nbsp;&nbsp;</span> Full
@@ -62,7 +89,7 @@
     </div>
 </div>
 
-<div class="section-padding">
+<div class="section-padding extra-top-padding" id="rooms">
     <div class="container">
         <div class="text-center mb-5"><h2 class="section-title">Our Accommodations</h2></div>
         <div class="row">
@@ -74,12 +101,12 @@
                             {% if room.images %}
                                 {% for img in room.images %}
                                 <div class="carousel-item {% if loop.first %}active{% endif %} h-100">
-                                    <img src="{{ img.image_url }}" class="room-img">
+                                    <img src="{{ img.image_url }}" class="room-img rounded-img-custom">
                                 </div>
                                 {% endfor %}
                             {% else %}
                                 <div class="carousel-item active h-100">
-                                    <img src="https://via.placeholder.com/400x250?text=No+Image" class="room-img">
+                                    <img src="https://via.placeholder.com/400x250?text=No+Image" class="room-img rounded-img-custom">
                                 </div>
                             {% endif %}
                         </div>
@@ -109,7 +136,7 @@
     </div>
 </div>
 
-<div class="section-padding" style="background-color: rgba(0,0,0,0.02);">
+<div class="section-padding" style="background-color: rgba(0,0,0,0.02);" id="info">
     <div class="container">
         <div class="row">
             <div class="col-md-8">
