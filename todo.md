@@ -20,25 +20,18 @@ all time in libya time
 
 
 
-v29:
 
-server {
-    listen 80;
-    server_name yourdomain.com;
-
-    client_max_body_size 10M;  # <--- CRITICAL: Allow up to 10MB uploads
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
 
 - 
 
 - remove Reset Staff password.
-- multi line in the succes message?
  - email and phone not saved.
  remove staff login,
- change to 2026
+ 
+
+new checks:
+remove guest filter
+put max booked rooms to two
+one request for the next 10 months. make the change in the js side.
+
+when i make booking or bokck room, it rserve the whole day in the calender. i want to be from 2pm to 10am next day.

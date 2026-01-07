@@ -23,13 +23,9 @@ def logout_bypass(extension: str):
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
     
-    # --- AUTO-FIX: Ensure Visitor Table Exists ---
-    # This runs every time admin is loaded to ensure the DB is up to date
-    try:
-        models.Base.metadata.create_all(bind=db.get_bind())
-    except Exception as e:
-        print(f"DB Maintenance Warning: {e}")
-    # ---------------------------------------------
+    # # Auto-Fix DB
+    # try: models.Base.metadata.create_all(bind=db.get_bind())
+    # except: pass
 
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
@@ -63,12 +59,9 @@ def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", sea
     
     logs = db.query(models.AuditLog).filter(models.AuditLog.site_config_id == config.id).order_by(models.AuditLog.timestamp.desc()).limit(100).all()
     
-    # FETCH VISITORS
     visitors = []
-    try:
-        visitors = db.query(models.Visitor).filter(models.Visitor.site_config_id == config.id).order_by(models.Visitor.timestamp.desc()).limit(200).all()
-    except Exception as e:
-        print(f"Error fetching visitors (Table might not exist yet): {e}")
+    try: visitors = db.query(models.Visitor).filter(models.Visitor.site_config_id == config.id).order_by(models.Visitor.timestamp.desc()).limit(200).all()
+    except: pass
 
     total_capacity = sum([r.total_quantity for r in rooms])
     occupied = base_q.filter(models.Booking.check_in <= today, models.Booking.check_out > today, models.Booking.status.in_(['checked_in', 'confirmed'])).count()
@@ -89,20 +82,44 @@ def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", sea
 def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']
     units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
+    
+    # 1. Define Groups (Rows)
     groups = [{"id": u.id, "content": f"<strong>{u.room_type.name}</strong> - {u.label}"} for u in units]
+    
+    # ADD "UNASSIGNED" GROUP AT TOP
+    groups.insert(0, {"id": "unassigned", "content": "<span style='color:red; font-weight:bold;'>⚠️ UNASSIGNED / FRAGMENTED</span>", "style": "background-color: #ffe6e6;"})
+
     bookings = db.query(models.Booking).filter(models.Booking.site_config_id == config.id, models.Booking.status.in_(['confirmed', 'pending', 'checked_in', 'checked_out'])).all()
     items = []
+    
     for b in bookings:
-        if b.room_unit_id:
-            color = '#3788d8'
-            if b.status == 'pending': color = '#ffc107'
-            elif b.status == 'checked_in': color = '#198754'
-            elif b.status == 'checked_out': color = '#6c757d'
-            items.append({"id": b.id, "group": b.room_unit_id, "content": f"{b.guest_name}", "start": b.check_in.isoformat(), "end": b.check_out.isoformat(), "style": f"background-color: {color}; color: white; cursor: pointer; opacity: 0.7; border-radius: 6px;"})
+        # Determine Color
+        color = '#3788d8'
+        if b.status == 'pending': color = '#ffc107'
+        elif b.status == 'checked_in': color = '#198754'
+        elif b.status == 'checked_out': color = '#6c757d'
+        
+        # Determine Group
+        group_id = b.room_unit_id if b.room_unit_id else "unassigned"
+        
+        # Special Style for Unassigned
+        style = f"background-color: {color}; color: white; cursor: pointer; opacity: 0.7; border-radius: 6px;"
+        if group_id == "unassigned":
+            style = "background-color: #dc3545; color: white; border: 2px solid red; font-weight: bold;"
+
+        items.append({
+            "id": b.id, 
+            "group": group_id, 
+            "content": f"{b.guest_name}", 
+            "start": b.check_in.isoformat(), 
+            "end": b.check_out.isoformat(), 
+            "style": style
+        })
     
     blocks = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     for m in blocks:
         if m.room_unit_id: items.append({"id": f"maint_{m.id}", "group": m.room_unit_id, "content": "BLOCKED", "start": m.start_date.isoformat(), "end": m.end_date.isoformat(), "style": "background-color: black; opacity: 0.5; border-radius: 6px;", "type": "background"})
+    
     return JSONResponse(content={"groups": groups, "items": items})
 
 @router.post("/app/{extension}/admin/update_site")
@@ -230,7 +247,14 @@ def edit_booking_save(request: Request, extension: str, booking_id: int, guest_n
         booking.total_price = new_total
     booking.guest_name = guest_name; booking.guest_email = guest_email; booking.guest_phone = guest_phone
     booking.check_in = c_in; booking.check_out = c_out
-    booking.room_unit_id = room_unit_id; booking.status = status; booking.deposit_amount = deposit; booking.notes = notes
+    
+    # ALLOW NULL UNIT ASSIGNMENT (For fragmented bookings)
+    if room_unit_id == -1 or room_unit_id == 0: 
+        booking.room_unit_id = None
+    else:
+        booking.room_unit_id = room_unit_id
+        
+    booking.status = status; booking.deposit_amount = deposit; booking.notes = notes
     if changes: log_activity(db, config.id, context['user'].username, "Update Booking", booking.booking_code, ", ".join(changes))
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#bookings", status_code=303)
@@ -252,7 +276,10 @@ async def new_booking_save(request: Request, extension: str, guest_name: str = F
         for u in all_units:
             conflict = db.query(models.Booking).filter(models.Booking.room_unit_id == u.id, models.Booking.check_in < c_out, models.Booking.check_out > c_in).first()
             if not conflict: final_unit_id = u.id; break
-    if not final_unit_id: return RedirectResponse(f"/app/{extension}/admin?error=No+Unit+Available", status_code=303)
+            
+    # PERMIT UNASSIGNED BOOKING IN ADMIN TOO
+    # If final_unit_id is still None, we just create it as None.
+    
     total = calculate_price(db, config.id, room_id, c_in, c_out, 1)
     b_code = f"RES-{uuid.uuid4().hex[:6].upper()}"
     new_booking = models.Booking(site_config_id=config.id, room_type_id=room_id, room_unit_id=final_unit_id, booking_code=b_code, guest_name=guest_name, guest_email=guest_email, guest_phone=guest_phone, check_in=c_in, check_out=c_out, status=status, total_price=total, deposit_amount=deposit, rooms_booked=1, notes=notes, created_at=datetime.now())
