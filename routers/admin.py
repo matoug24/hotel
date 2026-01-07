@@ -23,6 +23,14 @@ def logout_bypass(extension: str):
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
     
+    # --- AUTO-FIX: Ensure Visitor Table Exists ---
+    # This runs every time admin is loaded to ensure the DB is up to date
+    try:
+        models.Base.metadata.create_all(bind=db.get_bind())
+    except Exception as e:
+        print(f"DB Maintenance Warning: {e}")
+    # ---------------------------------------------
+
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     all_units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
@@ -55,6 +63,13 @@ def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", sea
     
     logs = db.query(models.AuditLog).filter(models.AuditLog.site_config_id == config.id).order_by(models.AuditLog.timestamp.desc()).limit(100).all()
     
+    # FETCH VISITORS
+    visitors = []
+    try:
+        visitors = db.query(models.Visitor).filter(models.Visitor.site_config_id == config.id).order_by(models.Visitor.timestamp.desc()).limit(200).all()
+    except Exception as e:
+        print(f"Error fetching visitors (Table might not exist yet): {e}")
+
     total_capacity = sum([r.total_quantity for r in rooms])
     occupied = base_q.filter(models.Booking.check_in <= today, models.Booking.check_out > today, models.Booking.status.in_(['checked_in', 'confirmed'])).count()
     occupancy_rate = int((occupied / total_capacity * 100) if total_capacity > 0 else 0)
@@ -66,7 +81,7 @@ def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", sea
         "checkins_tomorrow_list": checkins_tmrw, "checkouts_tomorrow_list": checkouts_tmrw,
         "upcoming_bookings": upcoming, "active_bookings": active_bookings,
         "financials": {"future_deposits": round(future_dep, 2), "outstanding_balance": 0.0, "chart_labels": chart_labels, "chart_data": chart_data, "recent_bookings": []},
-        "stats": {"revenue": round(revenue,2), "occupancy": occupancy_rate}, "logs": logs,
+        "stats": {"revenue": round(revenue,2), "occupancy": occupancy_rate}, "logs": logs, "visitors": visitors,
         "search_results": search_results, "search_query": search, "msg": request.query_params.get("success"), "err": request.query_params.get("error"), "sort_by": sort_by
     })
 
@@ -102,13 +117,19 @@ def update_site(extension: str, hotel_name: str = Form(...), highlights: str = F
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Settings+Updated#site", status_code=303)
 
-# --- NEW LOGO UPLOAD ---
 @router.post("/app/{extension}/admin/upload_logo")
 async def upload_logo(extension: str, logo: UploadFile = File(...), context: dict = Depends(verify_hotel_admin)):
     file_path = f"static/uploads/{extension}_logo.png"
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(logo.file, buffer)
     return RedirectResponse(f"/app/{extension}/admin?success=Logo+Updated#hero", status_code=303)
+
+@router.post("/app/{extension}/admin/delete_logo")
+def delete_logo(extension: str, context: dict = Depends(verify_hotel_admin)):
+    file_path = f"static/uploads/{extension}_logo.png"
+    if os.path.exists(file_path):
+        os.remove(file_path)
+    return RedirectResponse(f"/app/{extension}/admin?success=Logo+Deleted#hero", status_code=303)
 
 @router.post("/app/{extension}/admin/add_user")
 def add_user(extension: str, username: str = Form(...), password: str = Form(...), role: str = Form("staff"), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):

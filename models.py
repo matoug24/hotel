@@ -10,7 +10,7 @@ class SiteConfig(Base):
     hotel_name = Column(String, default="Azure Horizon Beach Hotel")
     highlights = Column(String, default="Experience paradise.")
     about_description = Column(Text, default="Welcome to Azure Horizon.")
-    amenities_list = Column(Text, default="Free Wi-Fi\nPool")
+    amenities_list = Column(Text, default="Free Wi-Fi\\nPool")
     rules = Column(Text, default="Check-in: 2PM.")
     contact_email = Column(String, default="info@example.com")
     contact_phone = Column(String, default="+1 555 0199")
@@ -31,6 +31,9 @@ class SiteConfig(Base):
     images = relationship("HeroImage", back_populates="config", cascade="all, delete-orphan")
     seasons = relationship("SeasonalRate", back_populates="config", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="config", cascade="all, delete-orphan")
+    
+    # ADDED: Visitor Relationship
+    visitors = relationship("Visitor", back_populates="config", cascade="all, delete-orphan")
 
 class User(Base):
     __tablename__ = "users"
@@ -69,6 +72,8 @@ class RoomUnit(Base):
     label = Column(String) 
     # REMOVED: cleaning_status column
     room_type = relationship("RoomType", back_populates="units")
+    # Link back to booking if needed
+    bookings = relationship("Booking", back_populates="assigned_unit")
 
 class RoomImage(Base):
     __tablename__ = "room_images"
@@ -98,7 +103,7 @@ class Booking(Base):
     notes = Column(Text, default="") 
     config = relationship("SiteConfig", back_populates="bookings")
     room = relationship("RoomType")
-    assigned_unit = relationship("RoomUnit")
+    assigned_unit = relationship("RoomUnit", back_populates="bookings")
 
 class SeasonalRate(Base):
     __tablename__ = "seasonal_rates"
@@ -134,3 +139,15 @@ class AuditLog(Base):
     target = Column(String)
     details = Column(Text)
     config = relationship("SiteConfig", back_populates="audit_logs")
+
+# ADDED: Visitor Model
+class Visitor(Base):
+    __tablename__ = "visitors"
+    id = Column(Integer, primary_key=True, index=True)
+    site_config_id = Column(Integer, ForeignKey("site_config.id"))
+    ip_address = Column(String)
+    user_agent = Column(String)
+    path = Column(String)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    
+    config = relationship("SiteConfig", back_populates="visitors")

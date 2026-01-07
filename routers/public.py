@@ -11,13 +11,37 @@ from sqlalchemy import func
 
 router = APIRouter()
 
+# --- TRACK VISITOR WITH LOGGING ---
+def track_visitor(request: Request, config_id: int, db: Session):
+    try:
+        ip = request.client.host if request.client else "0.0.0.0"
+        ua = request.headers.get("user-agent", "unknown")
+        path = request.url.path
+        
+        # LOG TO CONSOLE
+        print(f"--- VISITOR TRACKED: {ip} on {path} ---")
+        
+        new_visit = models.Visitor(
+            site_config_id=config_id,
+            ip_address=ip,
+            user_agent=ua,
+            path=path,
+            timestamp=datetime.now()
+        )
+        db.add(new_visit)
+        db.commit()
+    except Exception as e:
+        print(f"Tracking Error (Check DB Table): {e}")
+
 @router.get("/app/{extension}")
 @limiter.limit("60/minute")
 def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
     config = get_config(extension, db)
     if not config.is_active: return templates.TemplateResponse("maintenance.html", {"request": request})
     
-    # Check for Logo
+    # TRACK VISIT
+    track_visitor(request, config.id, db)
+    
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
     
@@ -33,7 +57,9 @@ def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
 @limiter.limit("20/minute")
 def hotel_search(request: Request, extension: str, check_in: str = Form(...), check_out: str = Form(...), guests: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
-    # Check for Logo
+    # TRACK SEARCH
+    track_visitor(request, config.id, db)
+
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
 
@@ -54,7 +80,6 @@ def hotel_search(request: Request, extension: str, check_in: str = Form(...), ch
 @router.get("/app/{extension}/book/{room_id}")
 def book_page(request: Request, extension: str, room_id: int, check_in: Optional[str] = None, check_out: Optional[str] = None, guests: int = 1, db: Session = Depends(get_db)):
     config = get_config(extension, db)
-    # Check for Logo
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
 
@@ -66,7 +91,6 @@ def book_page(request: Request, extension: str, room_id: int, check_in: Optional
 @limiter.limit("5/minute")
 def book_confirm(request: Request, extension: str, room_id: int = Form(...), guest_name: str = Form(...), guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), check_in: str = Form(...), check_out: str = Form(...), rooms_needed: int = Form(1), guests_count: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
-    # Check for Logo
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
 
