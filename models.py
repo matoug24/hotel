@@ -1,10 +1,16 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean
 from sqlalchemy.orm import relationship
-from datetime import datetime
+# Import new time helper (assuming it's importable, or we use a lambda)
+from core import get_current_time 
 from database import Base
 
+# Note: We can't easily pass the function itself as a default to SQLAlchmey column without it being a callable.
+# We will use 'default=get_current_time' in the logic, but for schema definitions, 
+# standard practice is usually server_default=func.now() or client side.
+# Here we will rely on the routers passing the time or use a wrapper.
+
 class SiteConfig(Base):
-    __tablename__ = "site_config"  # REVERTED: Singular
+    __tablename__ = "site_config"
     id = Column(Integer, primary_key=True, index=True)
     extension = Column(String, unique=True, index=True)
     hotel_name = Column(String, default="Azure Horizon Beach Hotel")
@@ -93,7 +99,7 @@ class Booking(Base):
     rooms_booked = Column(Integer, default=1)
     guests_count = Column(Integer, default=1)
     status = Column(String, default="pending") 
-    created_at = Column(DateTime)
+    created_at = Column(DateTime, default=get_current_time) # Uses Libya Time
     total_price = Column(Float, default=0.0)
     deposit_amount = Column(Float, default=0.0)
     notes = Column(Text, default="") 
@@ -129,7 +135,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     id = Column(Integer, primary_key=True, index=True)
     site_config_id = Column(Integer, ForeignKey("site_config.id"))
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=get_current_time) # Uses Libya Time
     user = Column(String)
     action = Column(String)
     target = Column(String)
@@ -143,6 +149,6 @@ class Visitor(Base):
     ip_address = Column(String)
     user_agent = Column(String)
     path = Column(String)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=get_current_time) # Uses Libya Time
     
     config = relationship("SiteConfig", back_populates="visitors")
