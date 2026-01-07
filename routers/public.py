@@ -6,8 +6,9 @@ import os
 
 import models
 from database import get_db
-from core import templates, get_config, calculate_price, limiter, log_activity
-from sqlalchemy import func, and_
+# Import get_current_time from core
+from core import templates, get_config, calculate_price, limiter, get_current_time, log_activity
+from sqlalchemy import func
 
 router = APIRouter()
 
@@ -52,21 +53,17 @@ def track_visitor(request: Request, config_id: int, db: Session):
         ua = request.headers.get("user-agent", "unknown")
         path = request.url.path
         
-        # LOG TO CONSOLE
-        print(f"--- VISITOR TRACKED: {ip} on {path} ---")
-        
         new_visit = models.Visitor(
             site_config_id=config_id,
             ip_address=ip,
             user_agent=ua,
             path=path,
-            timestamp=datetime.now()
+            timestamp=get_current_time() # USE LIBYA TIME
         )
         db.add(new_visit)
         db.commit()
     except Exception as e:
-        db.rollback() 
-        print(f"Tracking Error (Rollback Performed): {e}")
+        db.rollback()
 
 @router.get("/app/{extension}")
 @limiter.limit("60/minute")
@@ -119,8 +116,10 @@ def book_page(request: Request, extension: str, room_id: int, check_in: Optional
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == config.id).first()
     
     if not check_in or not check_out:
-        check_in = datetime.now().strftime("%Y-%m-%d")
-        check_out = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        # Defaults also use Libya Time
+        now = get_current_time()
+        check_in = now.strftime("%Y-%m-%d")
+        check_out = (now + timedelta(days=1)).strftime("%Y-%m-%d")
         
     return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room, "prefill_check_in": check_in, "prefill_check_out": check_out, "prefill_guests": guests, "logo_url": logo_url})
 
@@ -150,7 +149,6 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
         best_unit = None
         min_gap = float('inf') # Start with infinite gap
         
-        # Step A: Filter Valid Candidates (Conflict Free)
         candidates = []
         for u in all_units:
             if u in assigned_units: continue
@@ -171,15 +169,11 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
             if not conflict and not maint:
                 candidates.append(u)
         
-        # If no specific unit fits (but inventory check passed), we leave it Unassigned.
         if not candidates:
             assigned_units.append(None)
             continue
 
-        # Step B: Score Candidates based on "Gap"
         for u in candidates:
-            # Find the booking that ends closest to our start date (without exceeding it)
-            # We look for the latest checkout that is <= new checkin
             last_booking = db.query(models.Booking.check_out).filter(
                 models.Booking.room_unit_id == u.id,
                 models.Booking.check_out <= c_in,
@@ -187,14 +181,10 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
             ).order_by(models.Booking.check_out.desc()).first()
             
             if last_booking:
-                # Gap calculation (Seconds between previous checkout and new checkin)
                 gap = (c_in - last_booking[0]).total_seconds()
             else:
-                # No previous booking found (Room is effectively empty or new)
-                # We give this a huge gap score because we prefer tight fits (gap ~ 0) over empty rooms
                 gap = 999999999.0
             
-            # We want the SMALLEST gap (Tightest fit)
             if gap < min_gap:
                 min_gap = gap
                 best_unit = u
@@ -227,7 +217,7 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
             total_price=total_one, 
             rooms_booked=1, 
             guests_count=guests_count, 
-            created_at=datetime.now()
+            created_at=get_current_time() # USE LIBYA TIME
         )
         db.add(bk)
         created_bookings.append(bk)

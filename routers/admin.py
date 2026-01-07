@@ -90,21 +90,31 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
     bookings = db.query(models.Booking).filter(models.Booking.site_config_id == config.id, models.Booking.status.in_(['confirmed', 'pending', 'checked_in', 'checked_out'])).all()
     items = []
     
+    # Common Flexbox style for centering text
+    center_style = "display: flex; align-items: center; justify-content: center; text-align: center;"
+    
     for b in bookings:
-        color = '#3788d8'
-        if b.status == 'pending': color = '#ffc107'
-        elif b.status == 'checked_in': color = '#198754'
-        elif b.status == 'checked_out': color = '#6c757d'
+        # Default: Confirmed = Green (#28a745)
+        color = '#28a745' 
+        font_color = 'white'
+        
+        if b.status == 'pending': 
+            color = '#ffc107' # Yellow
+            font_color = 'black'
+        elif b.status == 'checked_in': 
+            color = '#198754' # Dark Green
+        elif b.status == 'checked_out': 
+            color = '#6c757d' # Grey
         
         group_id = b.room_unit_id if b.room_unit_id else "unassigned"
-        style = f"background-color: {color}; color: white; cursor: pointer; opacity: 0.7; border-radius: 6px;"
-        if group_id == "unassigned":
-            style = "background-color: #dc3545; color: white; border: 2px solid red; font-weight: bold;"
-
-        # --- FIX: FORCE VISUAL START/END TIME ---
-        # The stored date might be at midnight, but for visual tape chart, we want 
-        # Check-in at 14:00 (2 PM) and Check-out at 10:00 (10 AM)
         
+        # Base Style: Color + Border + Centering
+        style = f"background-color: {color}; color: {font_color}; border: 1px solid black; cursor: pointer; opacity: 0.9; border-radius: 4px; {center_style}"
+        
+        if group_id == "unassigned":
+            style = f"background-color: #dc3545; color: white; border: 2px solid red; font-weight: bold; {center_style}"
+
+        # Force visual times
         start_vis = b.check_in.strftime("%Y-%m-%d") + "T14:00:00"
         end_vis = b.check_out.strftime("%Y-%m-%d") + "T10:00:00"
 
@@ -119,9 +129,11 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
     
     blocks = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     for m in blocks:
-        # Maintenance also 2PM start / 10AM end
         start_vis = m.start_date.strftime("%Y-%m-%d") + "T14:00:00"
         end_vis = m.end_date.strftime("%Y-%m-%d") + "T10:00:00"
+        
+        # BLOCKED: Blue (#0d6efd) with Black Border
+        style = f"background-color: #0d6efd; color: white; border: 1px solid black; opacity: 0.9; border-radius: 4px; {center_style}"
         
         if m.room_unit_id: 
             items.append({
@@ -130,8 +142,8 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
                 "content": "BLOCKED", 
                 "start": start_vis, 
                 "end": end_vis, 
-                "style": "background-color: black; opacity: 0.5; border-radius: 6px;", 
-                "type": "background"
+                "style": style
+                # Removed 'type': 'background' to make it a solid bar with border
             })
     
     return JSONResponse(content={"groups": groups, "items": items})
@@ -253,11 +265,7 @@ def edit_booking_page(request: Request, extension: str, booking_id: int, context
 def edit_booking_save(request: Request, extension: str, booking_id: int, guest_name: str = Form(...), guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), check_in: str = Form(...), check_out: str = Form(...), room_unit_id: int = Form(...), status: str = Form(...), deposit: float = Form(0.0), notes: str = Form(""), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']
     booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
-    
-    # USE LIBYA TIME for parsing if needed, but here we construct datetimes manually
-    c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0)
-    c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
-    
+    c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0); c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
     changes = []
     if booking.status != status: changes.append(f"Status: {booking.status}->{status}")
     if booking.check_in != c_in or booking.check_out != c_out or booking.room_type_id != booking.room_type_id or booking.rooms_booked != booking.rooms_booked:
@@ -286,8 +294,7 @@ def new_booking_page(request: Request, extension: str, context: dict = Depends(v
 @router.post("/app/{extension}/admin/new_booking")
 async def new_booking_save(request: Request, extension: str, guest_name: str = Form(...), guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), check_in: str = Form(...), check_out: str = Form(...), room_id: int = Form(...), room_unit_id: Optional[int] = Form(None), status: str = Form(...), deposit: float = Form(0.0), notes: str = Form(""), context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']
-    c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0)
-    c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
+    c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0); c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
     final_unit_id = room_unit_id
     if not final_unit_id:
         all_units = db.query(models.RoomUnit).filter(models.RoomUnit.room_type_id == room_id).all()
@@ -297,7 +304,6 @@ async def new_booking_save(request: Request, extension: str, guest_name: str = F
             
     total = calculate_price(db, config.id, room_id, c_in, c_out, 1)
     b_code = f"RES-{uuid.uuid4().hex[:6].upper()}"
-    # Use get_current_time() for creation
     new_booking = models.Booking(site_config_id=config.id, room_type_id=room_id, room_unit_id=final_unit_id, booking_code=b_code, guest_name=guest_name, guest_email=guest_email, guest_phone=guest_phone, check_in=c_in, check_out=c_out, status=status, total_price=total, deposit_amount=deposit, rooms_booked=1, notes=notes, created_at=get_current_time())
     db.add(new_booking); log_activity(db, config.id, context['user'].username, "Create Booking", b_code, "Manual Admin Creation")
     db.commit()
@@ -339,7 +345,6 @@ def generate_invoice(request: Request, extension: str, booking_id: int, context:
     config = context['config']
     booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
     subtotal = booking.total_price; tax = subtotal * 0.10; total = subtotal + tax; bal = total - booking.deposit_amount
-    # Invoice date should also use Libya time
     return templates.TemplateResponse("invoice.html", {"request": request, "config": config, "booking": booking, "subtotal": subtotal, "tax": tax, "total": total, "balance": bal, "now": get_current_time()})
 
 @router.post("/app/{extension}/admin/delete_booking")
@@ -387,12 +392,14 @@ async def edit_room_action(request: Request, extension: str, room_id: int, name:
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == config.id).first()
     room.name = name; room.price_per_night = price; room.total_quantity = qty; room.description = desc; room.capacity = capacity
     
+    # Sync Units
     raw_labels = [l.strip() for l in custom_labels.split(',') if l.strip()]
     existing_units = db.query(models.RoomUnit).filter(models.RoomUnit.room_type_id == room.id).order_by(models.RoomUnit.id).all()
     for i in range(qty):
         lbl = raw_labels[i] if i < len(raw_labels) else f"{name} #{i+1}"
         if i < len(existing_units): existing_units[i].label = lbl
         else: db.add(models.RoomUnit(room_type_id=room.id, label=lbl))
+    # Remove excess
     if len(existing_units) > qty:
         for i in range(qty, len(existing_units)): db.delete(existing_units[i])
         
