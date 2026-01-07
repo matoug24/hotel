@@ -4,13 +4,13 @@ from datetime import datetime
 from database import Base
 
 class SiteConfig(Base):
-    __tablename__ = "site_config"
+    __tablename__ = "site_config"  # REVERTED: Singular
     id = Column(Integer, primary_key=True, index=True)
     extension = Column(String, unique=True, index=True)
     hotel_name = Column(String, default="Azure Horizon Beach Hotel")
     highlights = Column(String, default="Experience paradise.")
     about_description = Column(Text, default="Welcome to Azure Horizon.")
-    amenities_list = Column(Text, default="Free Wi-Fi\\nPool")
+    amenities_list = Column(Text, default="Free Wi-Fi\nPool")
     rules = Column(Text, default="Check-in: 2PM.")
     contact_email = Column(String, default="info@example.com")
     contact_phone = Column(String, default="+1 555 0199")
@@ -31,8 +31,6 @@ class SiteConfig(Base):
     images = relationship("HeroImage", back_populates="config", cascade="all, delete-orphan")
     seasons = relationship("SeasonalRate", back_populates="config", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="config", cascade="all, delete-orphan")
-    
-    # ADDED: Visitor Relationship
     visitors = relationship("Visitor", back_populates="config", cascade="all, delete-orphan")
 
 class User(Base):
@@ -70,9 +68,7 @@ class RoomUnit(Base):
     id = Column(Integer, primary_key=True, index=True)
     room_type_id = Column(Integer, ForeignKey("room_types.id"))
     label = Column(String) 
-    # REMOVED: cleaning_status column
     room_type = relationship("RoomType", back_populates="units")
-    # Link back to booking if needed
     bookings = relationship("Booking", back_populates="assigned_unit")
 
 class RoomImage(Base):
@@ -140,7 +136,6 @@ class AuditLog(Base):
     details = Column(Text)
     config = relationship("SiteConfig", back_populates="audit_logs")
 
-# ADDED: Visitor Model
 class Visitor(Base):
     __tablename__ = "visitors"
     id = Column(Integer, primary_key=True, index=True)

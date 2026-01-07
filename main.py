@@ -15,13 +15,18 @@ from core import app, limiter, templates, get_config, verify_session, create_acc
 from routers import public, admin, owner, api
 
 # Initialize DB
-models.Base.metadata.create_all(bind=engine)
+# models.Base.metadata.create_all(bind=engine)
 
 # Include Routers
 app.include_router(public.router)
 app.include_router(admin.router)
 app.include_router(owner.router)
 app.include_router(api.router)
+
+# --- ROOT ROUTE: LANDING PAGE ---
+@app.get("/")
+async def root(request: Request):
+    return templates.TemplateResponse("landing.html", {"request": request})
 
 # Login Routes (Kept in Main or Auth Router)
 @app.get("/owner_login")

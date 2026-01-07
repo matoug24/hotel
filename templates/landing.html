@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Future of Libyan Tourism</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-gold: #D4AF37;
+            --deep-blue: #0f172a;
+            --glass-bg: rgba(255, 255, 255, 0.1);
+            --glass-border: rgba(255, 255, 255, 0.2);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            position: relative;
+        }
+
+        /* Abstract Background Elements */
+        .bg-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            z-index: 0;
+        }
+        .orb-1 {
+            width: 300px; height: 300px;
+            background: rgba(212, 175, 55, 0.2); /* Gold */
+            top: 10%; left: 20%;
+            animation: float 10s infinite ease-in-out;
+        }
+        .orb-2 {
+            width: 400px; height: 400px;
+            background: rgba(56, 189, 248, 0.1); /* Blue */
+            bottom: 10%; right: 20%;
+            animation: float 12s infinite ease-in-out reverse;
+        }
+
+        /* Main Container */
+        .container {
+            position: relative;
+            z-index: 10;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 4rem;
+            max-width: 1000px;
+            width: 90%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            display: flex;
+            gap: 4rem;
+            align-items: center;
+        }
+
+        /* Split Layout */
+        .content-en {
+            flex: 1;
+            text-align: left;
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding-right: 2rem;
+        }
+        
+        .content-ar {
+            flex: 1;
+            text-align: right;
+            font-family: 'Cairo', sans-serif;
+            direction: rtl;
+        }
+
+        /* Typography */
+        h1 {
+            font-size: 2.5rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(to right, #fff, #cbd5e1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            line-height: 1.2;
+        }
+
+        p {
+            font-size: 1.1rem;
+            line-height: 1.8;
+            color: #94a3b8;
+            font-weight: 300;
+        }
+
+        .highlight {
+            color: var(--primary-gold);
+            font-weight: 600;
+        }
+
+        /* Divider Logo/Icon */
+        .divider-icon {
+            display: none; /* Hidden on desktop split */
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            .container {
+                flex-direction: column-reverse;
+                padding: 2rem;
+                gap: 2rem;
+                height: auto;
+                max-height: 90vh;
+                overflow-y: auto;
+            }
+            
+            .content-en {
+                text-align: center;
+                border-right: none;
+                border-top: 1px solid rgba(255,255,255,0.1);
+                padding-right: 0;
+                padding-top: 2rem;
+            }
+
+            .content-ar {
+                text-align: center;
+            }
+
+            h1 { font-size: 1.8rem; }
+            p { font-size: 1rem; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(0, 30px); }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="bg-orb orb-1"></div>
+    <div class="bg-orb orb-2"></div>
+
+    <div class="container">
+        <div class="content-en">
+            <h1>Upgrade Your <br>Experience</h1>
+            <p>
+                We are working to transform the way 
+                <span class="highlight">tourism booking works in Libya</span>. 
+                <br><br>
+                Our mission is to digitize the industry, creating a seamless, 
+                efficient, and modern ecosystem for both customers and service providers.
+            </p>
+        </div>
+
+        <div class="content-ar">
+            <h1>نحو مستقبل <br>سياحي أفضل</h1>
+            <p>
+                نحن نعمل حالياً على تطوير وتحديث منظومة 
+                <span class="highlight">الحجوزات السياحية في ليبيا</span>.
+                <br><br>
+                هدفنا هو رقمنة القطاع بالكامل، لنجعل تجربة الحجز أسهل، 
+                أسرع، وأكثر كفاءة لكل من الزبائن ومزودي الخدمات السياحية.
+            </p>
+        </div>
+    </div>
+
+</body>
+</html>
