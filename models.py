@@ -1,13 +1,7 @@
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean
 from sqlalchemy.orm import relationship
-# Import new time helper (assuming it's importable, or we use a lambda)
 from core import get_current_time 
 from database import Base
-
-# Note: We can't easily pass the function itself as a default to SQLAlchmey column without it being a callable.
-# We will use 'default=get_current_time' in the logic, but for schema definitions, 
-# standard practice is usually server_default=func.now() or client side.
-# Here we will rely on the routers passing the time or use a wrapper.
 
 class SiteConfig(Base):
     __tablename__ = "site_config"
@@ -30,6 +24,12 @@ class SiteConfig(Base):
     booking_expiration_hours = Column(Integer, default=24)
     admin_password_hash = Column(String)
     booking_success_message = Column(Text, default="Please contact us within 24 hours to confirm your reservation.")
+    
+    # --- NEW SETTINGS ---
+    max_booking_days = Column(Integer, default=10)
+    max_rooms_per_booking = Column(Integer, default=2)
+    search_rate_limit = Column(String, default="20/minute")
+    booking_rate_limit = Column(String, default="5/minute")
     
     users = relationship("User", back_populates="config", cascade="all, delete-orphan")
     rooms = relationship("RoomType", back_populates="config", cascade="all, delete-orphan")
@@ -99,7 +99,7 @@ class Booking(Base):
     rooms_booked = Column(Integer, default=1)
     guests_count = Column(Integer, default=1)
     status = Column(String, default="pending") 
-    created_at = Column(DateTime, default=get_current_time) # Uses Libya Time
+    created_at = Column(DateTime, default=get_current_time)
     total_price = Column(Float, default=0.0)
     deposit_amount = Column(Float, default=0.0)
     notes = Column(Text, default="") 
@@ -135,7 +135,7 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
     id = Column(Integer, primary_key=True, index=True)
     site_config_id = Column(Integer, ForeignKey("site_config.id"))
-    timestamp = Column(DateTime, default=get_current_time) # Uses Libya Time
+    timestamp = Column(DateTime, default=get_current_time)
     user = Column(String)
     action = Column(String)
     target = Column(String)
@@ -149,6 +149,6 @@ class Visitor(Base):
     ip_address = Column(String)
     user_agent = Column(String)
     path = Column(String)
-    timestamp = Column(DateTime, default=get_current_time) # Uses Libya Time
+    timestamp = Column(DateTime, default=get_current_time)
     
     config = relationship("SiteConfig", back_populates="visitors")

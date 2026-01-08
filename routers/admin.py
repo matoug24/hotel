@@ -15,7 +15,6 @@ from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 router = APIRouter()
 
 # --- HELPER: IMMEDIATE EXPIRATION CHECK ---
-# Runs every time admin dashboard loads to ensure data is fresh in the UI
 def run_expiration_check(db: Session, config_id: int):
     try:
         now = get_current_time()
@@ -56,14 +55,11 @@ def logout_bypass(extension: str):
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
     
-    # 1. Ensure DB Tables Exist
     try: models.Base.metadata.create_all(bind=db.get_bind())
     except: pass
 
-    # 2. FORCE EXPIRATION CHECK
     run_expiration_check(db, config.id)
 
-    # 3. Load Data
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     all_units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
@@ -168,13 +164,30 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
     return JSONResponse(content={"groups": groups, "items": items})
 
 @router.post("/app/{extension}/admin/update_site")
-def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), email: str = Form(""), phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
+def update_site(
+    extension: str, 
+    hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), 
+    email: str = Form(""), phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), 
+    facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), 
+    booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24),
+    # NEW FIELDS
+    max_booking_days: int = Form(10), max_rooms_per_booking: int = Form(2),
+    search_rate_limit: str = Form("20/minute"), booking_rate_limit: str = Form("5/minute"),
+    db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)
+):
     if context['user'].role != 'admin': return "Unauthorized"
     config = context['config']
     config.hotel_name = hotel_name; config.highlights = highlights; config.about_description = about_description; config.amenities_list = amenities_list
     config.contact_email = email; config.contact_phone = phone; config.address = address; config.map_url = map_url
     config.facebook = facebook; config.instagram = instagram; config.youtube = youtube; config.rules = rules; config.booking_success_message = booking_success_message
     config.theme_id = theme_id; config.booking_expiration_hours = booking_expiration_hours
+    
+    # Save New Fields
+    config.max_booking_days = max_booking_days
+    config.max_rooms_per_booking = max_rooms_per_booking
+    config.search_rate_limit = search_rate_limit
+    config.booking_rate_limit = booking_rate_limit
+    
     log_activity(db, config.id, "Admin", "Update Settings", "Site Config", "Settings updated")
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin?success=Settings+Updated#site", status_code=303)
@@ -425,7 +438,7 @@ async def edit_room_action(request: Request, extension: str, room_id: int, name:
             if img.filename:
                 path = f"static/uploads/room_{room.id}_{uuid.uuid4().hex[:6]}.jpg"
                 await validate_and_save_image(img, path, "room")
-                db.add(models.RoomImage(room_id=new_room.id, image_url=f"/{path}"))
+                db.add(models.RoomImage(room_id=room.id, image_url=f"/{path}"))
     
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#rooms", status_code=303)

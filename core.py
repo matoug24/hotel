@@ -40,7 +40,7 @@ templates = Jinja2Templates(directory="templates")
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# --- LIMITER INSTANCE (Used by routers) ---
+# --- LIMITER INSTANCE ---
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 # Generate Hash once
@@ -52,9 +52,7 @@ def get_current_time():
 
 def log_activity(db: Session, config_id: int, user: str, action: str, target: str, details: str):
     safe_details = (details[:495] + '..') if len(details) > 500 else details
-    # Convert aware datetime to naive for SQLite/Postgres compatibility if needed, 
-    # but usually best to store aware if DB supports it. 
-    # Here we strip tzinfo to avoid "can't compare offset-naive and offset-aware" errors in simple setups.
+    # We strip tzinfo for SQLite/Postgres naive storage, but the value remains Libya time
     ts = get_current_time().replace(tzinfo=None) 
     new_log = models.AuditLog(site_config_id=config_id, timestamp=ts, user=user, action=action, target=target, details=safe_details)
     db.add(new_log)
@@ -84,8 +82,13 @@ async def validate_and_save_image(upload_file: UploadFile, destination: str, tar
 # --- AUTHENTICATION ---
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta: expire = datetime.utcnow() + expires_delta
-    else: expire = datetime.utcnow() + timedelta(minutes=15)
+    
+    # FIXED: Use get_current_time() (Libya) instead of utcnow()
+    if expires_delta: 
+        expire = get_current_time() + expires_delta
+    else: 
+        expire = get_current_time() + timedelta(minutes=15)
+    
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
@@ -110,7 +113,6 @@ def verify_session(request: Request, db: Session):
         user = db.query(models.User).filter(models.User.username == username).first()
         if user is None: return None
         
-        # Verify context match
         path = request.url.path
         if "/app/" in path:
             parts = path.split("/")

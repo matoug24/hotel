@@ -6,11 +6,24 @@ import os
 
 import models
 from database import get_db
-# Import get_current_time from core
 from core import templates, get_config, calculate_price, limiter, get_current_time, log_activity
 from sqlalchemy import func
 
 router = APIRouter()
+
+# --- RATE LIMIT HELPERS ---
+
+def get_hotel_extension_from_request(request: Request) -> str:
+    path_parts = request.url.path.split("/")
+    if len(path_parts) > 2 and path_parts[1] == "app":
+        return path_parts[2]
+    return "unknown"
+
+def get_rate_limit_key(request: Request) -> str:
+    # Key = IP + Hotel Extension (Separate limits per hotel)
+    ip = request.client.host if request.client else "unknown"
+    ext = get_hotel_extension_from_request(request)
+    return f"{ip}_{ext}"
 
 # --- HELPER: CHECK INVENTORY AVAILABILITY ---
 def check_inventory_availability(db: Session, config_id: int, room_type_id: int, start_date: datetime, end_date: datetime, total_qty: int):
@@ -58,7 +71,7 @@ def track_visitor(request: Request, config_id: int, db: Session):
             ip_address=ip,
             user_agent=ua,
             path=path,
-            timestamp=get_current_time() # USE LIBYA TIME
+            timestamp=get_current_time() 
         )
         db.add(new_visit)
         db.commit()
@@ -66,7 +79,7 @@ def track_visitor(request: Request, config_id: int, db: Session):
         db.rollback()
 
 @router.get("/app/{extension}")
-@limiter.limit("60/minute")
+@limiter.limit("60/minute", key_func=get_rate_limit_key)
 def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
     config = get_config(extension, db)
     if not config.is_active: return templates.TemplateResponse("maintenance.html", {"request": request})
@@ -82,7 +95,7 @@ def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
     })
 
 @router.post("/app/{extension}/search")
-@limiter.limit("20/minute")
+@limiter.limit("20/minute", key_func=get_rate_limit_key)
 def hotel_search(request: Request, extension: str, check_in: str = Form(...), check_out: str = Form(...), guests: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
     track_visitor(request, config.id, db)
@@ -95,8 +108,14 @@ def hotel_search(request: Request, extension: str, check_in: str = Form(...), ch
     except:
         return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Invalid dates.", "logo_url": logo_url})
 
-    if c_out <= c_in: return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Check-out must be after check-in.", "logo_url": logo_url})
+    if c_out <= c_in: 
+        return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Check-out must be after check-in.", "logo_url": logo_url})
     
+    # FIXED: Handle NoneType for max_booking_days by defaulting to 10
+    max_days = config.max_booking_days if config.max_booking_days is not None else 10
+    if (c_out - c_in).days > max_days:
+        return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": f"Maximum booking length is {max_days} days.", "logo_url": logo_url})
+
     available_rooms = []
     for r in config.rooms:
         if r.capacity < guests: continue
@@ -116,7 +135,6 @@ def book_page(request: Request, extension: str, room_id: int, check_in: Optional
     room = db.query(models.RoomType).filter(models.RoomType.id == room_id, models.RoomType.site_config_id == config.id).first()
     
     if not check_in or not check_out:
-        # Defaults also use Libya Time
         now = get_current_time()
         check_in = now.strftime("%Y-%m-%d")
         check_out = (now + timedelta(days=1)).strftime("%Y-%m-%d")
@@ -124,30 +142,41 @@ def book_page(request: Request, extension: str, room_id: int, check_in: Optional
     return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room, "prefill_check_in": check_in, "prefill_check_out": check_out, "prefill_guests": guests, "logo_url": logo_url})
 
 @router.post("/app/{extension}/book/confirm")
-@limiter.limit("5/minute")
+@limiter.limit("5/minute", key_func=get_rate_limit_key)
 def book_confirm(request: Request, extension: str, room_id: int = Form(...), guest_name: str = Form(...), guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), check_in: str = Form(...), check_out: str = Form(...), rooms_needed: int = Form(1), guests_count: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
     
+    room_type = db.query(models.RoomType).get(room_id)
     c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0)
     c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
     
-    room_type = db.query(models.RoomType).get(room_id)
+    # FIXED: Handle NoneType with defaults
+    max_rooms = config.max_rooms_per_booking if config.max_rooms_per_booking is not None else 2
+    max_days = config.max_booking_days if config.max_booking_days is not None else 10
 
-    # 1. Inventory Check
+    # 1. Max Rooms Check
+    if rooms_needed > max_rooms:
+        return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room_type, "error": f"You can only book up to {max_rooms} rooms at once.", "prefill_check_in": check_in, "prefill_check_out": check_out, "logo_url": logo_url})
+
+    # 2. Max Duration Check
+    duration = (c_out - c_in).days
+    if duration > max_days:
+        return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room_type, "error": f"Stay cannot exceed {max_days} days.", "prefill_check_in": check_in, "prefill_check_out": check_out, "logo_url": logo_url})
+
+    # 3. Inventory Check
     is_avail, count = check_inventory_availability(db, config.id, room_id, c_in, c_out, room_type.total_quantity)
-    
     if not is_avail or count < rooms_needed:
         return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room_type, "error": "Not enough rooms available for these dates.", "prefill_check_in": check_in, "prefill_check_out": check_out, "logo_url": logo_url})
 
-    # 2. Smart Assignment (Best Fit / Gap Minimization Strategy)
+    # 4. Smart Assignment (Gap Minimization)
     all_units = db.query(models.RoomUnit).filter(models.RoomUnit.room_type_id == room_id).all()
     assigned_units = []
     
     for _ in range(rooms_needed):
         best_unit = None
-        min_gap = float('inf') # Start with infinite gap
+        min_gap = float('inf')
         
         candidates = []
         for u in all_units:
@@ -191,7 +220,7 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
                 
         assigned_units.append(best_unit)
 
-    # 3. Create Bookings
+    # 5. Create Bookings
     total_one = calculate_price(db, config.id, room_id, c_in, c_out, 1)
     total_all = total_one * rooms_needed
     nights = (c_out - c_in).days
