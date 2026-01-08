@@ -14,6 +14,40 @@ from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 
 router = APIRouter()
 
+# --- HELPER: IMMEDIATE EXPIRATION CHECK ---
+# Runs every time admin dashboard loads to ensure data is fresh in the UI
+def run_expiration_check(db: Session, config_id: int):
+    try:
+        now = get_current_time()
+        config = db.query(models.SiteConfig).get(config_id)
+        if not config: return
+        
+        limit_hours = config.booking_expiration_hours
+        
+        pending = db.query(models.Booking).filter(
+            models.Booking.site_config_id == config_id,
+            models.Booking.status == 'pending'
+        ).all()
+        
+        for b in pending:
+            created = b.created_at
+            cutoff_time = created + timedelta(hours=limit_hours)
+            is_expired = False
+            
+            if created.tzinfo is None:
+                if cutoff_time < now.replace(tzinfo=None): is_expired = True
+            else:
+                if cutoff_time < now: is_expired = True
+            
+            if is_expired:
+                b.status = 'cancelled'
+                b.notes = (b.notes or "") + "\n[AdminLoad] Auto-Cancelled"
+                log_activity(db, config_id, "System", "Auto-Cancel", b.booking_code, "Expired (Checked on Dashboard Load)")
+        
+        db.commit()
+    except Exception as e:
+        print(f"Manual Check Error: {e}")
+
 @router.get("/app/{extension}/admin/logout_bypass")
 def logout_bypass(extension: str):
     return {"status": "logged_out"}
@@ -22,9 +56,14 @@ def logout_bypass(extension: str):
 def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", search: Optional[str] = None, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']; user = context['user']
     
+    # 1. Ensure DB Tables Exist
     try: models.Base.metadata.create_all(bind=db.get_bind())
     except: pass
 
+    # 2. FORCE EXPIRATION CHECK
+    run_expiration_check(db, config.id)
+
+    # 3. Load Data
     hotel_users = db.query(models.User).filter(models.User.site_config_id == config.id).all()
     rooms = db.query(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
     all_units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
@@ -36,63 +75,40 @@ def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", sea
     
     base_q = db.query(models.Booking).filter(models.Booking.site_config_id == config.id)
     
-    # 1. CHECK-INS / CHECK-OUTS
+    search_results = []
+    if search: search_results = base_q.filter(or_(models.Booking.booking_code.ilike(f"%{search}%"), models.Booking.guest_name.ilike(f"%{search}%"))).all()
+    
     checkins_today = base_q.filter(func.date(models.Booking.check_in) == today, models.Booking.status != 'cancelled').all()
     checkouts_today = base_q.filter(func.date(models.Booking.check_out) == today, models.Booking.status != 'cancelled').all()
     checkins_tmrw = base_q.filter(func.date(models.Booking.check_in) == tomorrow, models.Booking.status != 'cancelled').all()
     checkouts_tmrw = base_q.filter(func.date(models.Booking.check_out) == tomorrow, models.Booking.status != 'cancelled').all()
     
-    # 2. BOOKINGS LISTS
-    # Fetch more records because we are using Client-Side Pagination now
     upcoming_q = base_q.filter(func.date(models.Booking.check_in) >= today)
     upcoming = upcoming_q.order_by(models.Booking.check_in.asc()).limit(500).all()
     active_bookings = base_q.filter(models.Booking.status == 'checked_in').order_by(models.Booking.check_out.asc()).all()
     
-    # 3. FINANCIALS MATH
-    # Future Deposits (Confirmed/CheckedIn future checkins)
-    future_dep = db.query(func.sum(models.Booking.deposit_amount)).filter(
-        models.Booking.site_config_id == config.id, 
-        func.date(models.Booking.check_in) >= today, 
-        models.Booking.status.in_(['confirmed', 'checked_in'])
-    ).scalar() or 0.0
-
-    # Outstanding Balance (Active & Confirmed bookings: Total - Deposit)
-    # We sum (total_price - deposit_amount) for all valid active/future bookings
-    outstanding_q = db.query(models.Booking).filter(
-        models.Booking.site_config_id == config.id,
-        models.Booking.status.in_(['confirmed', 'checked_in']),
-        models.Booking.check_out >= today
-    ).all()
+    future_dep = db.query(func.sum(models.Booking.deposit_amount)).filter(models.Booking.site_config_id == config.id, func.date(models.Booking.check_in) >= today, models.Booking.status.in_(['confirmed', 'checked_in'])).scalar() or 0.0
+    
+    outstanding_q = db.query(models.Booking).filter(models.Booking.site_config_id == config.id, models.Booking.status.in_(['confirmed', 'checked_in']), models.Booking.check_out >= today).all()
     outstanding_bal = sum([b.total_price - b.deposit_amount for b in outstanding_q])
 
-    # 30-Day Revenue (Bookings checked out in last 30 days)
     thirty_days_ago = today - timedelta(days=30)
-    revenue_30_q = db.query(models.Booking).filter(
-        models.Booking.site_config_id == config.id,
-        models.Booking.status.in_(['checked_out', 'checked_in', 'confirmed']),
-        func.date(models.Booking.check_out) >= thirty_days_ago,
-        func.date(models.Booking.check_out) <= today
-    ).all()
+    revenue_30_q = db.query(models.Booking).filter(models.Booking.site_config_id == config.id, models.Booking.status.in_(['checked_out', 'checked_in', 'confirmed']), func.date(models.Booking.check_out) >= thirty_days_ago, func.date(models.Booking.check_out) <= today).all()
     revenue_30 = sum([b.total_price for b in revenue_30_q])
 
-    # Chart Data (Next 14 Days Forecast)
     chart_labels = []; chart_data = []
     for i in range(14):
         day_t = today + timedelta(days=i); chart_labels.append(day_t.strftime("%b %d"))
         day_b = base_q.filter(func.date(models.Booking.check_in) == day_t, models.Booking.status == 'confirmed').all()
         chart_data.append(sum([b.total_price - b.deposit_amount for b in day_b]))
     
-    # Recent Bookings List
     recent_bookings = base_q.order_by(models.Booking.created_at.desc()).limit(10).all()
-
-    # 4. LOGS & VISITORS (Increased limits for pagination)
     logs = db.query(models.AuditLog).filter(models.AuditLog.site_config_id == config.id).order_by(models.AuditLog.timestamp.desc()).limit(500).all()
     
     visitors = []
     try: visitors = db.query(models.Visitor).filter(models.Visitor.site_config_id == config.id).order_by(models.Visitor.timestamp.desc()).limit(1000).all()
     except: pass
 
-    # 5. STATS
     total_capacity = sum([r.total_quantity for r in rooms])
     occupied = base_q.filter(models.Booking.check_in <= today, models.Booking.check_out > today, models.Booking.status.in_(['checked_in', 'confirmed'])).count()
     occupancy_rate = int((occupied / total_capacity * 100) if total_capacity > 0 else 0)
@@ -103,52 +119,30 @@ def hotel_admin(request: Request, extension: str, sort_by: str = "check_in", sea
         "checkins_today_list": checkins_today, "checkouts_today_list": checkouts_today,
         "checkins_tomorrow_list": checkins_tmrw, "checkouts_tomorrow_list": checkouts_tmrw,
         "upcoming_bookings": upcoming, "active_bookings": active_bookings,
-        "financials": {
-            "future_deposits": round(future_dep, 2), 
-            "outstanding_balance": round(outstanding_bal, 2), # NEW
-            "past_30_revenue": round(revenue_30, 2),          # NEW
-            "chart_labels": chart_labels, 
-            "chart_data": chart_data, 
-            "recent_bookings": recent_bookings
-        },
-        "stats": {"revenue": round(revenue_30, 2), "occupancy": occupancy_rate}, # Updated stat
-        "logs": logs, "visitors": visitors,
+        "financials": {"future_deposits": round(future_dep, 2), "outstanding_balance": round(outstanding_bal, 2), "past_30_revenue": round(revenue_30, 2), "chart_labels": chart_labels, "chart_data": chart_data, "recent_bookings": recent_bookings},
+        "stats": {"revenue": round(revenue_30, 2), "occupancy": occupancy_rate}, "logs": logs, "visitors": visitors,
         "search_results": [], "search_query": search, "msg": request.query_params.get("success"), "err": request.query_params.get("error"), "sort_by": sort_by
     })
 
 @router.get("/app/{extension}/admin/api/tape_chart")
 def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
     config = context['config']
-    
-    # 1. Groups with Separators
     units = db.query(models.RoomUnit).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).order_by(models.RoomType.name, models.RoomUnit.label).all()
     
     groups = []
-    
-    # "Unassigned" Row first
     groups.append({"id": "unassigned", "content": "<span style='color:red; font-weight:bold;'>⚠️ UNASSIGNED</span>", "style": "background-color: #ffe6e6;"})
     
     last_room_type_id = None
-    
     for u in units:
-        # INSERT SEPARATOR if room type changes
         if last_room_type_id is not None and u.room_type_id != last_room_type_id:
-            groups.append({
-                "id": f"sep_{u.id}", 
-                "content": "", 
-                "style": "background-color: #e9ecef; height: 10px; border: none; pointer-events: none;", # Grey thin bar
-                "className": "group-separator" # For extra CSS if needed
-            })
-            
+            groups.append({"id": f"sep_{u.id}", "content": "", "style": "background-color: #e9ecef; height: 10px; border: none; pointer-events: none;", "className": "group-separator"})
         groups.append({"id": u.id, "content": f"<strong>{u.room_type.name}</strong> - {u.label}"})
         last_room_type_id = u.room_type_id
 
-    # 2. Items
     bookings = db.query(models.Booking).filter(models.Booking.site_config_id == config.id, models.Booking.status.in_(['confirmed', 'pending', 'checked_in', 'checked_out'])).all()
     items = []
     
     center_style = "display: flex; align-items: center; justify-content: center; text-align: center;"
-    
     for b in bookings:
         color = '#28a745' 
         font_color = 'white'
@@ -158,13 +152,10 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
         
         group_id = b.room_unit_id if b.room_unit_id else "unassigned"
         style = f"background-color: {color}; color: {font_color}; border: 1px solid black; cursor: pointer; opacity: 0.9; border-radius: 4px; {center_style}"
-        
-        if group_id == "unassigned":
-            style = f"background-color: #dc3545; color: white; border: 2px solid red; font-weight: bold; {center_style}"
+        if group_id == "unassigned": style = f"background-color: #dc3545; color: white; border: 2px solid red; font-weight: bold; {center_style}"
 
         start_vis = b.check_in.strftime("%Y-%m-%d") + "T14:00:00"
         end_vis = b.check_out.strftime("%Y-%m-%d") + "T10:00:00"
-
         items.append({"id": b.id, "group": group_id, "content": f"{b.guest_name}", "start": start_vis, "end": end_vis, "style": style})
     
     blocks = db.query(models.MaintenanceBlock).join(models.RoomType).filter(models.RoomType.site_config_id == config.id).all()
@@ -172,13 +163,10 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
         start_vis = m.start_date.strftime("%Y-%m-%d") + "T14:00:00"
         end_vis = m.end_date.strftime("%Y-%m-%d") + "T10:00:00"
         style = f"background-color: #0d6efd; color: white; border: 1px solid black; opacity: 0.9; border-radius: 4px; {center_style}"
-        
-        if m.room_unit_id: 
-            items.append({"id": f"maint_{m.id}", "group": m.room_unit_id, "content": "BLOCKED", "start": start_vis, "end": end_vis, "style": style})
+        if m.room_unit_id: items.append({"id": f"maint_{m.id}", "group": m.room_unit_id, "content": "BLOCKED", "start": start_vis, "end": end_vis, "style": style})
     
     return JSONResponse(content={"groups": groups, "items": items})
 
-# --- (Other endpoints remain the same, just included to complete the file) ---
 @router.post("/app/{extension}/admin/update_site")
 def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), email: str = Form(""), phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
     if context['user'].role != 'admin': return "Unauthorized"
@@ -437,7 +425,7 @@ async def edit_room_action(request: Request, extension: str, room_id: int, name:
             if img.filename:
                 path = f"static/uploads/room_{room.id}_{uuid.uuid4().hex[:6]}.jpg"
                 await validate_and_save_image(img, path, "room")
-                db.add(models.RoomImage(room_id=room.id, image_url=f"/{path}"))
+                db.add(models.RoomImage(room_id=new_room.id, image_url=f"/{path}"))
     
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#rooms", status_code=303)

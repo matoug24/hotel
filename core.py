@@ -5,23 +5,18 @@ import logging
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, Request, HTTPException, Depends, UploadFile
+from fastapi import Request, HTTPException, Depends, UploadFile
 from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles # FIXED: Added Import
 from fastapi.security import OAuth2PasswordBearer
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
 
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from PIL import Image
 from dotenv import load_dotenv
 
-# Rate Limiting
-from slowapi import Limiter, _rate_limit_exceeded_handler
+# Rate Limiting Utilities
+from slowapi import Limiter
 from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware
 
 import models
 from database import get_db
@@ -45,30 +40,8 @@ templates = Jinja2Templates(directory="templates")
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-# --- APP & MIDDLEWARE SETUP ---
+# --- LIMITER INSTANCE (Used by routers) ---
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
-
-app = FastAPI()
-
-# 1. Rate Limiting Middleware
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-app.add_middleware(SlowAPIMiddleware)
-
-# 2. Security Middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
-
-# 3. FIXED: Static Files Mount (Restores CSS and Images)
-os.makedirs("static/uploads", exist_ok=True)
-os.makedirs("static/css", exist_ok=True)
-app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Generate Hash once
 OWNER_HASH = pwd_context.hash(OWNER_PASSWORD)
@@ -79,7 +52,11 @@ def get_current_time():
 
 def log_activity(db: Session, config_id: int, user: str, action: str, target: str, details: str):
     safe_details = (details[:495] + '..') if len(details) > 500 else details
-    new_log = models.AuditLog(site_config_id=config_id, timestamp=get_current_time().replace(tzinfo=None), user=user, action=action, target=target, details=safe_details)
+    # Convert aware datetime to naive for SQLite/Postgres compatibility if needed, 
+    # but usually best to store aware if DB supports it. 
+    # Here we strip tzinfo to avoid "can't compare offset-naive and offset-aware" errors in simple setups.
+    ts = get_current_time().replace(tzinfo=None) 
+    new_log = models.AuditLog(site_config_id=config_id, timestamp=ts, user=user, action=action, target=target, details=safe_details)
     db.add(new_log)
 
 def calculate_price(db: Session, config_id: int, room_id: int, start: datetime, end: datetime, count: int):
