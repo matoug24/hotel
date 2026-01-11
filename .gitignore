@@ -3,10 +3,10 @@ __pycache__/
 .env    
 myEnv/   
 new_versions/
-# static/uploads
-# todo.md
-# .jpg
-# .png
-# .gif
-# .avif
-# todo.md
+static/uploads
+todo.md
+.jpg
+.png
+.gif
+.avif
+todo.md
