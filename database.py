@@ -7,6 +7,7 @@ import os
 
 # Load environment variables from .env file
 load_dotenv()
+# DATABASE CONNECTION DETAILS
 
 # PASSWORD: 203Nagwa
 username = os.getenv("db_username")
