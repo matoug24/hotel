@@ -17,9 +17,10 @@
 
     <ul class="nav nav-pills mb-4" id="adminTabs">
         <li class="nav-item"><a class="nav-link active" id="tab-dashboard" data-bs-toggle="pill" href="#dashboard">Tape Chart</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-requests" data-bs-toggle="pill" href="#requests">New Requests <span class="badge bg-warning text-dark">{{ new_requests_count }}</span></a></li>
         <li class="nav-item"><a class="nav-link" id="tab-financials" data-bs-toggle="pill" href="#financials">Financials</a></li>
         <li class="nav-item"><a class="nav-link" id="tab-active" data-bs-toggle="pill" href="#active">Active Guests</a></li>
-        <li class="nav-item"><a class="nav-link" id="tab-bookings" data-bs-toggle="pill" href="#bookings">Reservations</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-bookings" data-bs-toggle="pill" href="#bookings">Confirmed</a></li>
         <li class="nav-item"><a class="nav-link" id="tab-visitors" data-bs-toggle="pill" href="#visitors">Visitors</a></li>
         {% if user.role == 'admin' %}
         <li class="nav-item"><a class="nav-link" id="tab-logs" data-bs-toggle="pill" href="#logs">Logs</a></li>
@@ -35,9 +36,10 @@
     <div class="tab-content border-top pt-4">
         <div class="tab-pane fade show active" id="dashboard">
             <div class="row mb-4">
+                <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-warning"><div class="card-body"><h6 class="text-muted text-uppercase small">New Requests</h6><h2 class="display-6">{{ new_requests_count }}</h2></div></div></div>
                 <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-primary"><div class="card-body"><h6 class="text-muted text-uppercase small">Arrivals Today</h6><h2 class="display-6">{{ checkins_today_list|length }}</h2></div></div></div>
                 <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body"><h6 class="text-muted text-uppercase small">Departures Today</h6><h2 class="display-6">{{ checkouts_today_list|length }}</h2></div></div></div>
-                <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-warning"><div class="card-body"><h6 class="text-muted text-uppercase small">Occupancy Rate</h6><h2 class="display-6">{{ stats.occupancy }}%</h2></div></div></div>
+                <div class="col-md-3"><div class="card shadow-sm border-start border-4 border-secondary"><div class="card-body"><h6 class="text-muted text-uppercase small">Occupancy Rate</h6><h2 class="display-6">{{ stats.occupancy }}%</h2></div></div></div>
             </div>
             <div class="card shadow-sm">
                 <div class="card-header bg-white d-flex justify-content-between"><h5 class="mb-0">Tape Chart</h5></div>
@@ -47,13 +49,37 @@
             </div>
         </div>
 
+        <div class="tab-pane fade" id="requests">
+            <h4 class="mb-3 text-warning"><i class="bi bi-inbox-fill"></i> New & Pending Requests</h4>
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <table class="table table-hover mb-0" id="tableRequests">
+                        <thead class="table-warning"><tr><th>Code</th><th>Guest</th><th>Check-In</th><th>Check-Out</th><th>Room</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for b in request_bookings %}
+                            <tr>
+                                <td><strong>{{ b.booking_code }}</strong></td>
+                                <td>{{ b.guest_name }}</td>
+                                <td>{{ b.check_in.date() }}</td>
+                                <td>{{ b.check_out.date() }}</td>
+                                <td>{{ b.room.name }}</td>
+                                <td>{{ b.status|upper }}</td>
+                                <td>${{ b.total_price }}</td>
+                                <td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <div class="tab-pane fade" id="financials">
              <div class="row mb-4">
-                <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-info"><div class="card-body"><h6 class="text-muted small">Future Deposits</h6><h3 class="text-info">${{ financials.future_deposits }}</h3></div></div></div>
-                <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-danger"><div class="card-body"><h6 class="text-muted small">Outstanding (Active)</h6><h3 class="text-danger">${{ financials.outstanding_balance }}</h3></div></div></div>
-                <div class="col-md-4"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body"><h6 class="text-muted small">30-Day Revenue</h6><h3 class="text-success">${{ financials.past_30_revenue }}</h3></div></div></div>
+                <div class="col-md-6"><div class="card shadow-sm border-start border-4 border-danger"><div class="card-body"><h6 class="text-muted small">Outstanding (Next 7 Days)</h6><h3 class="text-danger">${{ financials.outstanding_balance }}</h3></div></div></div>
+                <div class="col-md-6"><div class="card shadow-sm border-start border-4 border-success"><div class="card-body"><h6 class="text-muted small">Revenue (Past 7 Days)</h6><h3 class="text-success">${{ financials.past_7_revenue }}</h3></div></div></div>
             </div>
-            <div class="row"><div class="col-md-8"><div class="card shadow-sm"><div class="card-header bg-white"><h5 class="mb-0">Cash Flow</h5></div><div class="card-body"><canvas id="financialChart"></canvas></div></div></div><div class="col-md-4"><div class="card shadow-sm"><div class="card-header bg-white"><h5 class="mb-0">Recent</h5></div><ul class="list-group list-group-flush">{% for b in financials.recent_bookings %}<li class="list-group-item d-flex justify-content-between"><div><strong>{{ b.guest_name }}</strong><br><small>{{ b.created_at.strftime('%Y-%m-%d') }}</small></div><div class="text-end"><span class="badge bg-light text-dark">${{ b.total_price }}</span></div></li>{% endfor %}</ul></div></div></div>
+            <div class="row"><div class="col-md-8"><div class="card shadow-sm"><div class="card-header bg-white"><h5 class="mb-0">Cash Flow (Forecast)</h5></div><div class="card-body"><canvas id="financialChart"></canvas></div></div></div><div class="col-md-4"><div class="card shadow-sm"><div class="card-header bg-white"><h5 class="mb-0">Today's Transactions</h5></div><ul class="list-group list-group-flush">{% for b in financials.todays_transactions %}<li class="list-group-item d-flex justify-content-between"><div><strong>{{ b.guest_name }}</strong><br><small>{{ b.created_at.strftime('%H:%M') }}</small></div><div class="text-end"><span class="badge bg-light text-dark">${{ b.total_price }}</span></div></li>{% else %}<li class="list-group-item text-center text-muted">No new bookings today</li>{% endfor %}</ul></div></div></div>
         </div>
 
         <div class="tab-pane fade" id="active">
@@ -112,14 +138,14 @@
             
             <hr class="my-5">
 
-            <h4 class="mb-3"><i class="bi bi-calendar-event"></i> All Upcoming Reservations</h4>
+            <h4 class="mb-3"><i class="bi bi-calendar-check"></i> Confirmed & Active Reservations</h4>
             <div class="card shadow-sm">
                 <div class="card-body">
                     <table class="table table-hover mb-0" id="tableBookings">
                         <thead class="table-dark"><tr><th>Code</th><th>Check-In</th><th>Check-Out</th><th>Guest</th><th>Room</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
                         <tbody>
                             {% for b in upcoming_bookings %}
-                            <tr class="{% if b.status == 'confirmed' %}table-success{% elif b.status == 'pending' %}table-warning{% elif b.status == 'checked_in' %}table-primary{% endif %}">
+                            <tr class="{% if b.status == 'confirmed' %}table-success{% elif b.status == 'checked_in' %}table-primary{% endif %}">
                                 <td><strong>{{ b.booking_code }}</strong></td>
                                 <td>{{ b.check_in.date() }}</td>
                                 <td>{{ b.check_out.date() }}</td>
@@ -287,23 +313,7 @@
                         <input type="number" name="max_rooms_per_booking" class="form-control" value="{{ config.max_rooms_per_booking }}">
                     </div>
                     
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Search Rate Limit</label>
-                        <select name="search_rate_limit" class="form-select">
-                            <option value="10/minute" {% if config.search_rate_limit == '10/minute' %}selected{% endif %}>Strict (10/min)</option>
-                            <option value="20/minute" {% if config.search_rate_limit == '20/minute' %}selected{% endif %}>Standard (20/min)</option>
-                            <option value="60/minute" {% if config.search_rate_limit == '60/minute' %}selected{% endif %}>High Traffic (60/min)</option>
-                        </select>
-                    </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Booking Rate Limit</label>
-                        <select name="booking_rate_limit" class="form-select">
-                            <option value="2/minute" {% if config.booking_rate_limit == '2/minute' %}selected{% endif %}>Strict (2/min)</option>
-                            <option value="5/minute" {% if config.booking_rate_limit == '5/minute' %}selected{% endif %}>Standard (5/min)</option>
-                            <option value="10/minute" {% if config.booking_rate_limit == '10/minute' %}selected{% endif %}>High Traffic (10/min)</option>
-                        </select>
-                    </div>
-                    
+               
                     <div class="col-md-12"><h5 class="mt-3">General Info</h5></div>
                     <div class="col-md-6 mb-3"><label>Hotel Name</label><input type="text" name="hotel_name" class="form-control" value="{{ config.hotel_name }}"></div>
                     <div class="col-md-12 mb-3"><label>Booking Success Message (shown to guest)</label><textarea name="booking_success_message" class="form-control" rows="2">{{ config.booking_success_message }}</textarea></div>
@@ -382,7 +392,7 @@
         loadTapeChart();
         
         // Initialize DataTables (50 per page)
-        $('#tableBookings, #tableActive, #tableVisitors, #tableLogs').DataTable({
+        $('#tableBookings, #tableRequests, #tableActive, #tableVisitors, #tableLogs').DataTable({
             "pageLength": 50,
             "order": [], // Disable initial sort
             "language": { "search": "Filter records:" }

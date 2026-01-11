@@ -19,7 +19,16 @@ security
 
 
 
+Libya 2222Nagwa
 
+in the Tape Chart tab, add new box like the Arrival Today, etc, that says New Requests. that is the number of pending bookings.
+
+in the finianical tab, remove futrue deposite and make the outstanding for the next 7 days, and the revenue in the past 7 days and change the recent  transactions to only today transaction.
+
+in the reservaitons tab, make reservaiton for confirmed and checkin only.
+
+
+Make new tab called New Requests. this should have table of database similar to the one in the Reservations tab but has only the Pending and cancelled bookings.
 
 - 
 
@@ -39,3 +48,5 @@ is this gonna work iwth https?
 remove admin password hash in the site config table
 booking, booked rooms ??
 I see datetime.utcnow()
+
+add new featrues to hotel, logest booking days, max rooms, and make the limiter selectable in the settings page of the amin page. @router.post("/app/{extension}/search") adn @router.post("/app/{extension}/book/confirm"). also, change the limit to be function of the ip and the externsion as well. so i want tthe limit to be separate for each hotel page.

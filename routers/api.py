@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 import models
 from database import get_db
@@ -13,7 +13,13 @@ router = APIRouter()
 
 @router.get("/api/calendar_events")
 def get_calendar_events(start: str, end: str, room_id: Optional[int] = None, db: Session = Depends(get_db)):
-    start_dt = datetime.strptime(start[:10], "%Y-%m-%d"); end_dt = datetime.strptime(end[:10], "%Y-%m-%d")
+    start_dt = datetime.strptime(start[:10], "%Y-%m-%d"); 
+
+    today = datetime.combine(date.today(), datetime.min.time())
+    if start_dt < today:
+        start_dt = today
+
+    end_dt = datetime.strptime(end[:10], "%Y-%m-%d")
     events = []; curr = start_dt
     
     while curr < end_dt:
@@ -22,12 +28,12 @@ def get_calendar_events(start: str, end: str, room_id: Optional[int] = None, db:
         if room_id:
             room = db.query(models.RoomType).filter(models.RoomType.id == room_id).first()
             if not room: return JSONResponse([])
-            booked = db.query(func.count(models.Booking.id)).filter(models.Booking.room_type_id == room_id, models.Booking.status.in_(['confirmed', 'pending']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar()
+            booked = db.query(func.count(models.Booking.id)).filter(models.Booking.room_type_id == room_id, models.Booking.status.in_(['confirmed', 'pending', 'checked_in']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar()
             blocked = db.query(func.sum(models.MaintenanceBlock.qty_blocked)).filter(models.MaintenanceBlock.room_type_id == room_id, models.MaintenanceBlock.start_date <= curr.date(), models.MaintenanceBlock.end_date > curr.date()).scalar() or 0
             remaining = room.total_quantity - booked - blocked
         else:
             total_capacity = db.query(func.sum(models.RoomType.total_quantity)).scalar() or 0
-            total_booked = db.query(func.count(models.Booking.id)).filter(models.Booking.status.in_(['confirmed', 'pending']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar() or 0
+            total_booked = db.query(func.count(models.Booking.id)).filter(models.Booking.status.in_(['confirmed', 'pending', 'checked_in']), models.Booking.check_in <= check_time, models.Booking.check_out > check_time).scalar() or 0
             total_blocked = db.query(func.sum(models.MaintenanceBlock.qty_blocked)).filter(models.MaintenanceBlock.start_date <= curr.date(), models.MaintenanceBlock.end_date > curr.date()).scalar() or 0
             remaining = total_capacity - total_booked - total_blocked
 
@@ -62,4 +68,5 @@ def api_calculate_price(extension: str, room_id: int = Form(...), check_in: str 
         total = calculate_price(db, config.id, room_id, c_in, c_out, rooms_needed)
         nights = (c_out - c_in).days
         return JSONResponse({"total": total, "nights": nights})
-    except Exception as e: return JSONResponse({"error": str(e)}, status_code=400)
+    except Exception as e: 
+        return JSONResponse({"error": str(e)}, status_code=400)

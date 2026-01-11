@@ -28,8 +28,6 @@ class SiteConfig(Base):
     # --- NEW SETTINGS ---
     max_booking_days = Column(Integer, default=10)
     max_rooms_per_booking = Column(Integer, default=2)
-    search_rate_limit = Column(String, default="20/minute")
-    booking_rate_limit = Column(String, default="5/minute")
     
     users = relationship("User", back_populates="config", cascade="all, delete-orphan")
     rooms = relationship("RoomType", back_populates="config", cascade="all, delete-orphan")

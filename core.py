@@ -2,7 +2,7 @@ import os
 import io
 import pytz
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone # ADDED timezone
 from typing import Optional
 
 from fastapi import Request, HTTPException, Depends, UploadFile
@@ -24,8 +24,8 @@ from sqlalchemy.orm import Session
 
 # --- CONFIGURATION ---
 load_dotenv()
-OWNER_PASSWORD = os.getenv("OWNER_PASSWORD", "owner")
-SECRET_KEY = os.getenv("SECRET_KEY", "09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7")
+OWNER_PASSWORD = os.getenv("OWNER_PASSWORD")
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 MAX_FILE_SIZE_MB = 5
@@ -52,8 +52,9 @@ def get_current_time():
 
 def log_activity(db: Session, config_id: int, user: str, action: str, target: str, details: str):
     safe_details = (details[:495] + '..') if len(details) > 500 else details
-    # We strip tzinfo for SQLite/Postgres naive storage, but the value remains Libya time
+    
     ts = get_current_time().replace(tzinfo=None) 
+    print('time:', ts, get_current_time())
     new_log = models.AuditLog(site_config_id=config_id, timestamp=ts, user=user, action=action, target=target, details=safe_details)
     db.add(new_log)
 
@@ -68,7 +69,7 @@ def calculate_price(db: Session, config_id: int, room_id: int, start: datetime, 
         curr += timedelta(days=1)
     return total * count
 
-async def validate_and_save_image(upload_file: UploadFile, destination: str, target_type: str):
+def validate_and_save_image(upload_file: UploadFile, destination: str, target_type: str):
     upload_file.file.seek(0, 2); file_size = upload_file.file.tell(); upload_file.file.seek(0)
     if file_size > MAX_FILE_SIZE_MB * 1024 * 1024: raise HTTPException(status_code=400, detail=f"File too large. Max size is {MAX_FILE_SIZE_MB}MB")
     content = upload_file.file.read()
@@ -83,11 +84,11 @@ async def validate_and_save_image(upload_file: UploadFile, destination: str, tar
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     
-    # FIXED: Use get_current_time() (Libya) instead of utcnow()
+    now = get_current_time()
     if expires_delta: 
-        expire = get_current_time() + expires_delta
+        expire = now + expires_delta
     else: 
-        expire = get_current_time() + timedelta(minutes=15)
+        expire = now + timedelta(minutes=15)
     
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
@@ -154,3 +155,47 @@ def verify_owner(request: Request, db: Session = Depends(get_db)):
     if not session_data or not session_data['is_owner']:
          raise HTTPException(status_code=303, headers={"Location": "/owner_login"})
     return True
+
+# core.py (Add to the bottom)
+
+def process_expired_bookings(db: Session, config_id: Optional[int] = None):
+    """
+    Centralized logic to cancel pending bookings that have exceeded their expiration time.
+    If config_id is provided, only checks that specific hotel (used in Admin).
+    If config_id is None, checks ALL hotels (used in Background Task).
+    """
+    try:
+        now_libya = get_current_time() # Uses the robust Libya time function
+        
+        # Start building the query
+        query = db.query(models.Booking).filter(models.Booking.status == 'pending')
+        
+        # Filter by specific hotel if requested
+        if config_id:
+            query = query.filter(models.Booking.site_config_id == config_id)
+            
+        pending_bookings = query.all()
+        
+        for b in pending_bookings:
+            # Re-fetch config if needed (e.g. joined loading) or access relation
+            hours = b.config.booking_expiration_hours
+            created_at = b.created_at
+            
+            # Robust Timezone Handling (Force to Libya Time)
+            if created_at.tzinfo is None:
+                created_at = LIBYA_TZ.localize(created_at)
+            else:
+                created_at = created_at.astimezone(LIBYA_TZ)
+            
+            cutoff_time = created_at + timedelta(hours=hours)
+            
+            if cutoff_time < now_libya:
+                b.status = 'cancelled'
+                b.notes = (b.notes or "") + "\n[System] Auto-Cancelled (Expired)"
+                # Log the activity
+                log_activity(db, b.site_config_id, "System", "Auto-Cancel", b.booking_code, "Booking time expired")
+        
+        db.commit()
+    except Exception as e:
+        print(f"Expiration Check Error: {e}")
+        db.rollback()

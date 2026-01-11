@@ -46,12 +46,3 @@ def logout(request: Request):
     response.delete_cookie("access_token")
     return response
 
-@router.get("/reset_db")
-def reset_db(db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
-    db.query(models.AuditLog).delete(); db.query(models.Booking).delete(); db.query(models.RoomImage).delete()
-    db.query(models.MaintenanceBlock).delete(); db.query(models.SeasonalRate).delete()
-    db.query(models.RoomUnit).delete(); db.query(models.RoomType).delete(); db.query(models.HeroImage).delete(); db.query(models.SiteConfig).delete(); db.query(models.User).delete()
-    default_hash = pwd_context.hash("password123")
-    config = models.SiteConfig(admin_password_hash=default_hash, booking_expiration_hours=24, highlights="Experience paradise.", about_description="Welcome.", amenities_list="Free Wi-Fi")
-    db.add(config); db.commit()
-    return "Database cleared & Updated!"
