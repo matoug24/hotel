@@ -22,7 +22,6 @@ class SiteConfig(Base):
     is_active = Column(Boolean, default=True)
     theme_id = Column(Integer, default=1)
     booking_expiration_hours = Column(Integer, default=24)
-    admin_password_hash = Column(String)
     booking_success_message = Column(Text, default="Please contact us within 24 hours to confirm your reservation.")
     
     # --- NEW SETTINGS ---

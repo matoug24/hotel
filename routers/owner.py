@@ -44,7 +44,7 @@ def logout(request: Request, db=Depends(get_db)):
             pass
 
     # Choose a safe default destination
-    target = f"/{extension}/login" if extension else "/"
+    target = f"/app/{extension}/login" if extension else "/"
 
     response = RedirectResponse(url=target, status_code=303)
     response.delete_cookie("access_token", path="/")

@@ -7,7 +7,6 @@ from typing import Optional
 
 from fastapi import Request, HTTPException, Depends, UploadFile
 from fastapi.templating import Jinja2Templates
-from fastapi.security import OAuth2PasswordBearer
 
 from passlib.context import CryptContext
 from jose import JWTError, jwt
@@ -38,7 +37,6 @@ logger = logging.getLogger("hotel_app")
 # --- COMMON OBJECTS ---
 templates = Jinja2Templates(directory="templates")
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # --- LIMITER INSTANCE ---
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])

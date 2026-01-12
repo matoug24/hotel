@@ -1,7 +1,7 @@
 import uuid
 import os
 import shutil
-from fastapi import APIRouter, Depends, Request, Form, UploadFile, File
+from fastapi import APIRouter, Depends, Request, Form, UploadFile, File, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import func, or_
 from typing import List, Optional
@@ -10,7 +10,7 @@ from datetime import datetime, timedelta, timezone
 import models
 from database import get_db
 from core import (templates, verify_hotel_admin, log_activity, calculate_price, validate_and_save_image, 
-                  get_current_time, pwd_context, process_expired_bookings)
+                  get_current_time, pwd_context, process_expired_bookings, verify_session)
 from fastapi.responses import RedirectResponse, JSONResponse, HTMLResponse
 
 router = APIRouter()
@@ -180,7 +180,7 @@ def get_tape_chart(extension: str, context: dict = Depends(verify_hotel_admin), 
     return JSONResponse(content={"groups": groups, "items": items})
 
 @router.post("/app/{extension}/admin/update_site")
-def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), email: str = Form(""), phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), max_booking_days: int = Form(10), max_rooms_per_booking: int = Form(2),  db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
+def update_site(extension: str, hotel_name: str = Form(...), highlights: str = Form(""), about_description: str = Form(""), amenities_list: str = Form(""), email: str = Form(""), phone: str = Form(""), address: str = Form(""), map_url: str = Form(""), facebook: str = Form(""), instagram: str = Form(""), youtube: str = Form(""), rules: str = Form(""), booking_success_message: str = Form(...), theme_id: int = Form(1), booking_expiration_hours: int = Form(24), is_active: Optional[str] = Form(None),  max_booking_days: int = Form(10), max_rooms_per_booking: int = Form(2),  db: Session = Depends(get_db), context: dict = Depends(verify_hotel_admin)):
     if context['user'].role != 'admin': return "Unauthorized"
     config = context['config']
     config.hotel_name = hotel_name; config.highlights = highlights; config.about_description = about_description; config.amenities_list = amenities_list; config.contact_email = email; config.contact_phone = phone; config.address = address; config.map_url = map_url; config.facebook = facebook; config.instagram = instagram; config.youtube = youtube; config.rules = rules; config.booking_success_message = booking_success_message; config.theme_id = theme_id; config.booking_expiration_hours = booking_expiration_hours
@@ -279,33 +279,93 @@ def edit_booking_page(request: Request, extension: str, booking_id: int, context
     return templates.TemplateResponse("edit_booking.html", {"request": request, "config": config, "booking": booking, "rooms": rooms, "units": units, "balance": balance})
 
 @router.post("/app/{extension}/admin/edit_booking/{booking_id}")
-def edit_booking_save(request: Request, extension: str, booking_id: int, guest_name: str = Form(...), 
-                      guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), 
-                      check_in: str = Form(...), check_out: str = Form(...), room_unit_id: int = Form(...), 
-                      status: str = Form(...), deposit: float = Form(0.0), notes: str = Form(""), 
-                      context: dict = Depends(verify_hotel_admin), db: Session = Depends(get_db)):
-    
-    config = context['config']
-    booking = db.query(models.Booking).filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id).first()
-    c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0); c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
-    changes = []
-    if booking.status != status: 
-        changes.append(f"Status: {booking.status}->{status}")
+def edit_booking_save(
+    extension: str,
+    booking_id: int,
+    guest_name: str = Form(""),
+    guest_email: str = Form(""),
+    guest_phone: str = Form(""),
+    check_in: str = Form(...),
+    check_out: str = Form(...),
+    room_unit_id: int = Form(0),
+    status: str = Form(...),
+    deposit: float = Form(0),
+    notes: str = Form(""),
 
-    if booking.check_in != c_in or booking.check_out != c_out or booking.room_type_id != booking.room_type_id or booking.rooms_booked != booking.rooms_booked:
-        new_total = calculate_price(db, config.id, booking.room_type_id, c_in, c_out, booking.rooms_booked); 
-        booking.total_price = new_total
+    # Optional so you don't 422 until you add these fields to edit_booking.html
+    room_type_id: Optional[int] = Form(None),
+    rooms_booked: Optional[int] = Form(None),
+
+    context=Depends(verify_hotel_admin),
+    db: Session = Depends(get_db),
+):
+    config = context["config"]
+
+    booking = (
+        db.query(models.Booking)
+        .filter(models.Booking.id == booking_id, models.Booking.site_config_id == config.id)
+        .first()
+    )
+    if not booking:
+        raise HTTPException(status_code=404, detail="Booking not found")
+
+    # Parse dates
+    c_in = datetime.strptime(check_in, "%Y-%m-%d").replace(hour=14, minute=0)
+    c_out = datetime.strptime(check_out, "%Y-%m-%d").replace(hour=11, minute=0)
+    if c_out <= c_in:
+        raise HTTPException(status_code=400, detail="Invalid dates")
+
+    # Use existing values if form did not provide them (backward compatible)
+    new_room_type_id = booking.room_type_id if room_type_id is None else int(room_type_id)
+    new_rooms_booked = booking.rooms_booked if rooms_booked is None else int(rooms_booked)
+
+    if new_rooms_booked < 1:
+        raise HTTPException(status_code=400, detail="rooms_booked must be >= 1")
+
+    # Validate room type belongs to this hotel (especially important if room_type_id can change)
+    room_type = (
+        db.query(models.RoomType)
+        .filter(models.RoomType.id == new_room_type_id, models.RoomType.site_config_id == config.id)
+        .first()
+    )
+    if not room_type:
+        raise HTTPException(status_code=400, detail="Invalid room type")
+
+    # Detect changes that should trigger repricing
+    dates_changed = (c_in != booking.check_in) or (c_out != booking.check_out)
+    room_changed = (new_room_type_id != booking.room_type_id)
+    qty_changed = (new_rooms_booked != booking.rooms_booked)
+
+    # Apply updates
     booking.guest_name = guest_name
     booking.guest_email = guest_email
     booking.guest_phone = guest_phone
     booking.check_in = c_in
     booking.check_out = c_out
-    if room_unit_id == -1 or room_unit_id == 0: 
+    booking.status = status
+    booking.deposit_amount = deposit
+    booking.notes = notes
+
+    booking.room_type_id = new_room_type_id
+    booking.rooms_booked = new_rooms_booked
+
+    # Room unit handling (kept consistent with your existing logic)
+    if room_unit_id in (-1, 0):
         booking.room_unit_id = None
-    else: 
+    else:
         booking.room_unit_id = room_unit_id
-    booking.status = status; booking.deposit_amount = deposit; booking.notes = notes
-    if changes: log_activity(db, config.id, context['user'].username, "Update Booking", booking.booking_code, ", ".join(changes))
+
+    # Recalculate total price if needed
+    if dates_changed or room_changed or qty_changed:
+        booking.total_price = calculate_price(
+            db,
+            config.id,
+            new_room_type_id,
+            c_in,
+            c_out,
+            new_rooms_booked,
+        )
+
     db.commit()
     return RedirectResponse(f"/app/{extension}/admin#bookings", status_code=303)
 

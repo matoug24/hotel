@@ -33,6 +33,13 @@ origins = [
     "https://libyanbooking.com",
     "http://localhost:8000", # Keep this only for local testing
 ]
+
+allowed_hosts=[
+        "libyanbooking.com",
+        "www.libyanbooking.com",
+        "localhost",
+        "127.0.0.1",
+    ],
 # --- BACKGROUND TASK: CLEANUP EXPIRED BOOKINGS ---
 async def cancel_expired_bookings_task():
     while True:
@@ -106,4 +113,4 @@ def login_action(username: str = Form(...), password: str = Form(...), context: 
     return response
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="127.0.0.1", port=8000)
+    uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)
