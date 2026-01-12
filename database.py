@@ -9,11 +9,10 @@ import os
 load_dotenv()
 # DATABASE CONNECTION DETAILS
 
-# PASSWORD: 203Nagwa
 username = os.getenv("db_username")
 password = os.getenv("db_password")
 db_name = os.getenv("db")
-SQLALCHEMY_DATABASE_URL = f"postgresql://{username}:{password}@localhost/{db_name}"
+SQLALCHEMY_DATABASE_URL = f"postgresql://{username}:{password}@localhost:5432/{db_name}"
 
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)

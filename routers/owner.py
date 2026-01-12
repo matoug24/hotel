@@ -3,7 +3,8 @@ from sqlalchemy.orm import Session
 from fastapi.responses import RedirectResponse, HTMLResponse
 import models
 from database import get_db
-from core import templates, verify_owner, log_activity, pwd_context, OWNER_HASH
+from core import templates, verify_owner, log_activity, pwd_context, SECRET_KEY, ALGORITHM
+from jose import jwt, JWTError
 
 router = APIRouter()
 
@@ -26,23 +27,26 @@ def reset_hotel_password(config_id: int = Form(...), role: str = Form(...), db: 
     if user: user.password_hash = pwd_context.hash("ResetToday"); log_activity(db, config_id, "Owner", "Password Reset", f"{role} User", "Reset"); db.commit(); return RedirectResponse(url="/owner?success=Password+Reset", status_code=303)
     return RedirectResponse(url="/owner?error=User+Not+Found", status_code=303)
 
-# GLOBAL LOGOUT (Handled in Owner Router as it is general)
 @router.get("/logout")
-def logout(request: Request):
-    referer = request.headers.get("referer")
-    redirect_url = "/"
-    if referer and "/app/" in referer:
-        try: redirect_url = "/app/" + referer.split("/app/")[1].split("/")[0]
-        except: pass
-    elif referer and "owner" in referer: redirect_url = "/owner_login"
-    
-    # Poison Cache if Admin (using the bypass logic)
-    if referer and "/admin" in referer:
-        html_content = f"""<!DOCTYPE html><html><head><title>Logging Out...</title></head><body><h3>Logging out...</h3><script>var xhr=new XMLHttpRequest();xhr.open("GET", "{referer}/logout_bypass", true);xhr.setRequestHeader("Authorization","Basic "+btoa("logout:logout"));xhr.onreadystatechange=function(){{if(xhr.readyState==4){{window.location.href="{redirect_url}";}}}};xhr.send();</script></body></html>"""
-        response = HTMLResponse(content=html_content)
-    else:
-        response = RedirectResponse(url=redirect_url, status_code=303)
-    
-    response.delete_cookie("access_token")
-    return response
+def logout(request: Request, db=Depends(get_db)):
+    token = request.cookies.get("access_token")
+    extension = None
 
+    if token:
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            config_id = payload.get("config_id")
+            if config_id:
+                cfg = db.query(models.SiteConfig).filter(models.SiteConfig.id == config_id).first()
+                if cfg:
+                    extension = cfg.extension
+        except JWTError:
+            pass
+
+    # Choose a safe default destination
+    target = f"/{extension}/login" if extension else "/"
+
+    response = RedirectResponse(url=target, status_code=303)
+    response.delete_cookie("access_token", path="/")
+    # response.delete_cookie("csrf_token", path="/")  # if you implement CSRF as above
+    return response

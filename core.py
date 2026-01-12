@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session
 
 # --- CONFIGURATION ---
 load_dotenv()
-OWNER_PASSWORD = os.getenv("OWNER_PASSWORD")
+OWNER_HASH = os.getenv("OWNER_HASH")
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
@@ -44,7 +44,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/minute"])
 
 # Generate Hash once
-OWNER_HASH = pwd_context.hash(OWNER_PASSWORD)
+
 
 # --- HELPER FUNCTIONS ---
 def get_current_time():
@@ -101,17 +101,21 @@ def get_current_user_token(request: Request):
 
 def verify_session(request: Request, db: Session):
     token = get_current_user_token(request)
-    if not token: return None 
+    if not token: 
+        return None 
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         role: str = payload.get("role")
+        config_id = payload.get("config_id")
         
-        if username is None: return None
+        if username is None: 
+            return None
         if role == "admin_owner":
             return {"config": None, "user": models.User(username="SiteOwner", role="admin"), "is_owner": True}
             
-        user = db.query(models.User).filter(models.User.username == username).first()
+        user = db.query(models.User).filter(models.User.username == username,
+                                            models.User.site_config_id == config_id).first()
         if user is None: return None
         
         path = request.url.path

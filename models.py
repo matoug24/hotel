@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean, UniqueConstraint
 from sqlalchemy.orm import relationship
 from core import get_current_time 
 from database import Base
@@ -39,6 +39,8 @@ class SiteConfig(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("site_config_id", "username", name="uq_user_tenant_username"),)
+
     id = Column(Integer, primary_key=True, index=True)
     site_config_id = Column(Integer, ForeignKey("site_config.id"))
     username = Column(String, index=True)
