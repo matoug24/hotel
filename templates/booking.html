@@ -4,7 +4,7 @@
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="content-card p-4">
-                <h3 class="section-title text-start mb-4">Complete Your Booking</h3>
+                <h3 class="section-title text-start mb-4">أكمل حجزك</h3>
                 
                 <div class="mb-4 bg-light rounded overflow-hidden">
                     <div class="row g-0">
@@ -21,11 +21,11 @@
                                 {% if room.images|length > 1 %}
                                 <button class="carousel-control-prev" type="button" data-bs-target="#bookingRoomCarousel" data-bs-slide="prev">
                                     <span class="carousel-control-prev-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Previous</span>
+                                    <span class="visually-hidden">السابق</span>
                                 </button>
                                 <button class="carousel-control-next" type="button" data-bs-target="#bookingRoomCarousel" data-bs-slide="next">
                                     <span class="carousel-control-next-icon" aria-hidden="true"></span>
-                                    <span class="visually-hidden">Next</span>
+                                    <span class="visually-hidden">التالي</span>
                                 </button>
                                 {% endif %}
                             </div>
@@ -37,8 +37,8 @@
                         <div class="col-md-7 p-4">
                             <h4 class="fw-bold mb-2">{{ room.name }}</h4>
                             <div class="mb-3">
-                                <span class="badge bg-secondary me-2"><i class="bi bi-people-fill"></i> Capacity: {{ room.capacity }}</span>
-                                <span class="badge bg-success"><i class="bi bi-tag-fill"></i> ${{ room.price_per_night }} / night</span>
+                                <span class="badge bg-secondary me-2"><i class="bi bi-people-fill"></i> السعة: {{ room.capacity }}</span>
+                                <span class="badge bg-success"><i class="bi bi-tag-fill"></i> ${{ room.price_per_night }} / ليلة</span>
                             </div>
                             <p class="text-muted small mb-0" style="white-space: pre-line;">{{ room.description }}</p>
                         </div>
@@ -49,60 +49,60 @@
                 <div class="alert alert-danger">{{ error }}</div>
                 {% endif %}
 
-                <form action="/app/{{ config.extension }}/book/confirm" method="post" id="bookingForm">
+                <form action="/{{ config.extension }}/book/confirm" method="post" id="bookingForm">
                     <input type="hidden" name="room_id" value="{{ room.id }}" id="roomId">
                     <input type="hidden" name="extension" value="{{ config.extension }}" id="extensionId">
                     
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Check-In</label>
+                            <label class="form-label fw-bold">تاريخ الوصول</label>
                             <input type="date" name="check_in" id="checkIn" class="form-control" value="{{ prefill_check_in }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Check-Out</label>
+                            <label class="form-label fw-bold">تاريخ المغادرة</label>
                             <input type="date" name="check_out" id="checkOut" class="form-control" value="{{ prefill_check_out }}" required>
                         </div>
                     </div>
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Number of Rooms</label>
+                            <label class="form-label fw-bold">عدد الغرف</label>
                             <input type="number" name="rooms_needed" id="roomsNeeded" class="form-control" value="1" min="1" max="{{ room.available_now }}" required>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Total Guests</label>
+                            <label class="form-label fw-bold">إجمالي الضيوف</label>
                             <input type="number" name="guests_count" class="form-control" value="{{ prefill_guests }}" min="1" required>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label fw-bold">Full Name</label>
+                        <label class="form-label fw-bold">الاسم الكامل</label>
                         <input type="text" name="guest_name" class="form-control" required>
                     </div>
                     <div class="row g-3 mb-4">
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Email</label>
+                            <label class="form-label fw-bold">البريد الإلكتروني</label>
                             <input type="email" name="guest_email" class="form-control">
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label fw-bold">Phone</label>
+                            <label class="form-label fw-bold">رقم الهاتف</label>
                             <input type="text" name="guest_phone" class="form-control">
                         </div>
                     </div>
 
                     <div class="bg-light p-3 rounded mb-4 text-center border">
-                        <h4 class="mb-0" id="priceDisplay">Calculating...</h4>
+                        <h4 class="mb-0" id="priceDisplay">جاري الحساب...</h4>
                         <small class="text-muted" id="nightCount">...</small>
                     </div>
 
-                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow-sm">Confirm Reservation</button>
+                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow-sm">تأكيد الحجز</button>
                 </form>
             </div>
         </div>
         
         <div class="col-md-4 mt-4 mt-md-0">
             <div class="content-card p-3">
-                <h5 class="mb-3 text-center">Availability</h5>
+                <h5 class="mb-3 text-center">جدول التوفر</h5>
                 <div id="room-calendar-container">
                     <div id="roomCalendar"></div>
                 </div>
@@ -112,14 +112,18 @@
 </div>
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/ar.global.min.js'></script>
+
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('roomCalendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
+            locale: 'ar', // Set calendar to Arabic
+            direction: 'rtl',
             height: 'auto',
             headerToolbar: { left: 'prev', center: 'title', right: 'next' },
-            events: '/api/calendar_events?room_id={{ room.id }}'
+            events: '/{{ config.extension }}/api/calendar_events?room_id={{ room.id }}'
         });
         calendar.render();
 
@@ -138,17 +142,17 @@
             fd.append('check_out', checkOutEl.value);
             fd.append('rooms_needed', roomsEl.value);
 
-            fetch(`/app/${extension}/api/calculate_price`, { method: 'POST', body: fd })
+            fetch(`/${extension}/api/calculate_price`, { method: 'POST', body: fd })
                 .then(r => r.json())
                 .then(data => {
                     if(data.error) {
-                        priceDisplay.innerText = "Invalid Dates";
+                        priceDisplay.innerText = "تواريخ غير صالحة";
                         priceDisplay.className = "text-danger fw-bold";
                         nightCount.innerText = "";
                     } else {
-                        priceDisplay.innerText = "$" + data.total.toFixed(2);
+                        priceDisplay.innerText = data.total.toFixed(2) + " $";
                         priceDisplay.className = "text-success fw-bold display-6";
-                        nightCount.innerText = `${data.nights} Nights | ${roomsEl.value} Room(s)`;
+                        nightCount.innerText = `${data.nights} ليلة | ${roomsEl.value} غرفة`;
                     }
                 });
         }

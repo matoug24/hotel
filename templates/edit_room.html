@@ -4,10 +4,10 @@
     <div class="card shadow">
         <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
             <h3 class="mb-0">Edit Room: {{ room.name }}</h3>
-            <a href="/app/{{ config.extension }}/admin#rooms" class="btn btn-light btn-sm">Back to Dashboard</a>
+            <a href="/{{ config.extension }}/admin#rooms" class="btn btn-light btn-sm">Back to Dashboard</a>
         </div>
         <div class="card-body">
-            <form action="/app/{{ config.extension }}/admin/edit_room/{{ room.id }}" method="post" enctype="multipart/form-data">
+            <form action="/{{ config.extension }}/admin/edit_room/{{ room.id }}" method="post" enctype="multipart/form-data">
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Room Name</label>
@@ -58,7 +58,7 @@
                     <div class="card h-100">
                         <img src="{{ img.image_url }}" class="card-img-top" style="height: 150px; object-fit: cover;">
                         <div class="card-body p-2">
-                            <form action="/app/{{ config.extension }}/admin/delete_room_image" method="post">
+                            <form action="/{{ config.extension }}/admin/delete_room_image" method="post">
                                 <input type="hidden" name="img_id" value="{{ img.id }}">
                                 <input type="hidden" name="room_id" value="{{ room.id }}">
                                 <button class="btn btn-danger btn-sm w-100">Delete</button>

@@ -1,9 +1,9 @@
 {% extends "base_public.html" %}
 {% block content %}
 <div class="container section-padding">
-    <h2 class="section-title">Search Results</h2>
+    <h2 class="section-title">نتائج البحث</h2>
     <div class="alert alert-info text-center mb-5">
-        Showing rooms available from <strong>{{ check_in }}</strong> to <strong>{{ check_out }}</strong> for <strong>{{ guests }}</strong> guest(s).
+        عرض الغرف المتاحة من <strong>{{ check_in }}</strong> إلى <strong>{{ check_out }}</strong> لـ <strong>{{ guests }}</strong> ضيوف.
     </div>
 
     <div class="row">
@@ -24,17 +24,17 @@
                     
                     <div class="my-3">
                         <h4 class="text-success fw-bold">${{ room.dynamic_total }}</h4>
-                        <small class="text-muted">Total Price for stay</small>
+                        <small class="text-muted">السعر الإجمالي للإقامة</small>
                     </div>
                     
-                    <a href="/app/{{ config.extension }}/book/{{ room.id }}?check_in={{ check_in }}&check_out={{ check_out }}&guests={{ guests }}" class="btn-primary-custom mt-auto">Select Room</a>
+                    <a href="/{{ config.extension }}/book/{{ room.id }}?check_in={{ check_in }}&check_out={{ check_out }}&guests={{ guests }}" class="btn-primary-custom mt-auto">اختر الغرفة</a>
                 </div>
             </div>
         </div>
         {% else %}
         <div class="col-12 text-center">
-            <h4 class="text-muted">No rooms available for these dates/criteria.</h4>
-            <a href="/app/{{ config.extension }}" class="btn btn-secondary mt-3">Try different dates</a>
+            <h4 class="text-muted">لا توجد غرف متاحة لهذه التواريخ/المعايير.</h4>
+            <a href="/{{ config.extension }}" class="btn btn-secondary mt-3">جرب تواريخ مختلفة</a>
         </div>
         {% endfor %}
     </div>

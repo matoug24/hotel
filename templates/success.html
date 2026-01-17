@@ -5,27 +5,27 @@
         <div class="mb-4">
             <i class="bi bi-check-circle-fill text-success" style="font-size: 4rem;"></i>
         </div>
-        <h2 class="mb-3">Reservation Confirmed!</h2>
+        <h2 class="mb-3">تم تأكيد الحجز!</h2>
         <p class="lead mb-4" style="white-space: pre-wrap;">{{ config.booking_success_message }}</p>
         
         <div class="bg-light p-3 rounded mb-4 text-start">
             {% for b in bookings %}
             <div class="border-bottom pb-2 mb-2">
-                <strong>Booking ID:</strong> <span class="text-primary">{{ b.booking_code }}</span><br>
-                <strong>Guest:</strong> {{ b.guest_name }}<br>
-                <strong>Dates:</strong> {{ b.check_in.date() }} to {{ b.check_out.date() }}<br>
-                <strong>Room:</strong> {{ b.room.name }} <br>
+                <strong>رقم الحجز:</strong> <span class="text-primary">{{ b.booking_code }}</span><br>
+                <strong>الضيف:</strong> {{ b.guest_name }}<br>
+                <strong>التاريخ:</strong> {{ b.check_in.date() }} إلى {{ b.check_out.date() }}<br>
+                <strong>الغرفة:</strong> {{ b.room.name }} <br>
                 {% if b.assigned_unit %}
-                <strong>Unit:</strong> {{ b.assigned_unit.label }}
+                <strong>الوحدة:</strong> {{ b.assigned_unit.label }}
                 {% endif %}
             </div>
             {% endfor %}
             <div class="mt-3 text-end">
-                <h5>Total: ${{ total_cost }}</h5>
+                <h5>الإجمالي: ${{ total_cost }}</h5>
             </div>
         </div>
 
-        <a href="/app/{{ config.extension }}" class="btn btn-primary-custom w-100">Return Home</a>
+        <a href="/{{ config.extension }}" class="btn btn-primary-custom w-100">العودة للرئيسية</a>
     </div>
 </div>
 {% endblock %}

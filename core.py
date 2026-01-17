@@ -117,11 +117,12 @@ def verify_session(request: Request, db: Session):
         if user is None: return None
         
         path = request.url.path
-        if "/app/" in path:
-            parts = path.split("/")
-            if len(parts) > 2:
-                ext_in_url = parts[2]
-                if user.config.extension != ext_in_url: return None 
+        parts = path.split("/")
+
+        if len(parts) > 1 and parts[1]:
+            ext_in_url = parts[1]
+            if user.config.extension != ext_in_url:
+                return None
                     
         return {"config": user.config, "user": user, "is_owner": False}
     except JWTError: return None
@@ -137,19 +138,21 @@ def verify_hotel_admin(request: Request, db: Session = Depends(get_db)):
     if not session_data:
         path = request.url.path
         login_url = "/owner_login"
-        if "/app/" in path:
-            parts = path.split("/")
-            if len(parts) > 2: login_url = f"/app/{parts[2]}/login"
+        parts = path.split("/")
+
+        if len(parts) > 1 and parts[1]:
+            login_url = f"/{parts[1]}/login"
         raise HTTPException(status_code=303, headers={"Location": login_url})
         
     if session_data['is_owner']:
         path = request.url.path
-        if "/app/" in path:
-            parts = path.split("/")
-            if len(parts) > 2:
-                ext = parts[2]
-                config = db.query(models.SiteConfig).filter(models.SiteConfig.extension == ext).first()
-                if config: session_data['config'] = config
+        parts = path.split("/")
+        if len(parts) > 1 and parts[1]:
+            ext = parts[1]
+            config = db.query(models.SiteConfig).filter(
+                models.SiteConfig.extension == ext
+            ).first()
+            if config: session_data['config'] = config
     return session_data
 
 def verify_owner(request: Request, db: Session = Depends(get_db)):

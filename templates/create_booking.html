@@ -1,9 +1,9 @@
 {% extends "base_admin.html" %}
 {% block content %}
 <div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4"><h2>Create Booking</h2><a href="/app/{{ config.extension }}/admin" class="btn btn-secondary">Back</a></div>
+    <div class="d-flex justify-content-between align-items-center mb-4"><h2>Create Booking</h2><a href="/{{ config.extension }}/admin" class="btn btn-secondary">Back</a></div>
     <div class="card shadow p-4">
-        <form action="/app/{{ config.extension }}/admin/new_booking" method="post">
+        <form action="/{{ config.extension }}/admin/new_booking" method="post">
             <div class="row">
                 <div class="col-md-4 mb-3"><label>Guest Name</label><input type="text" name="guest_name" class="form-control" required></div>
                 <div class="col-md-4 mb-3"><label>Phone</label><input type="text" name="guest_phone" class="form-control"></div>

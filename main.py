@@ -72,10 +72,10 @@ app.add_middleware(TrustedHostMiddleware, allowed_hosts=["*"])
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-app.include_router(public.router)
-app.include_router(admin.router)
 app.include_router(owner.router)
 app.include_router(api.router)
+app.include_router(admin.router)
+
 
 @app.get("/")
 async def root(request: Request):
@@ -86,7 +86,7 @@ async def root(request: Request):
 def owner_login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request, "hotel_name": "Site Owner", "action_url": "/login_action", "context": "owner"})
 
-@app.get("/app/{extension}/login")
+@app.get("/{extension}/login")
 def hotel_login_page(request: Request, extension: str, db: Session = Depends(get_db)):
     config = get_config(extension, db)
     return templates.TemplateResponse("login.html", {"request": request, "hotel_name": config.hotel_name, "action_url": "/login_action", "context": extension})
@@ -99,18 +99,20 @@ def login_action(username: str = Form(...), password: str = Form(...), context: 
         else: return RedirectResponse("/owner_login?error=Invalid+Credentials", status_code=303)
     else:
         config = db.query(models.SiteConfig).filter(models.SiteConfig.extension == context).first()
-        if not config: return RedirectResponse(f"/app/{context}/login?error=Hotel+Not+Found", status_code=303)
+        if not config: return RedirectResponse(f"/{context}/login?error=Hotel+Not+Found", status_code=303)
         if username == "owner" and pwd_context.verify(password, OWNER_HASH): role = "admin_owner"; config_id = config.id
         else:
             user = db.query(models.User).filter(models.User.username == username, models.User.site_config_id == config.id).first()
-            if not user or not pwd_context.verify(password, user.password_hash): return RedirectResponse(f"/app/{context}/login?error=Invalid+Credentials", status_code=303)
+            if not user or not pwd_context.verify(password, user.password_hash): return RedirectResponse(f"/{context}/login?error=Invalid+Credentials", status_code=303)
             role = user.role; config_id = config.id
             
     access_token = create_access_token(data={"sub": username, "role": role, "config_id": config_id}, expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
-    target = "/owner" if context == "owner" else f"/app/{context}/admin"
+    target = "/owner" if context == "owner" else f"/{context}/admin"
     response = RedirectResponse(url=target, status_code=303)
     response.set_cookie(key="access_token", value=f"Bearer {access_token}", httponly=True, max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60, secure=True, samesite="lax")
     return response
+
+app.include_router(public.router)
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="127.0.0.1", port=8000, reload=True)

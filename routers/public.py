@@ -19,7 +19,8 @@ router = APIRouter()
 
 def get_hotel_extension_from_request(request: Request) -> str:
     path_parts = request.url.path.split("/")
-    if len(path_parts) > 2 and path_parts[1] == "app": return path_parts[2]
+    if len(path_parts) > 1 and path_parts[1]:
+        return path_parts[1]
     return "unknown"
 
 def get_rate_limit_key(request: Request) -> str:
@@ -49,7 +50,7 @@ def track_visitor(request: Request, config_id: int, db: Session):
         db.add(new_visit); db.commit()
     except Exception: db.rollback()
 
-@router.get("/app/{extension}")
+@router.get("/{extension}")
 @limiter.limit("30/minute", key_func=get_rate_limit_key)
 def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
     config = get_config(extension, db)
@@ -57,24 +58,26 @@ def hotel_home(request: Request, extension: str, db: Session = Depends(get_db)):
     track_visitor(request, config.id, db)
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
-    return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "logo_url": logo_url})
+    indexFile = f"index{config.theme_id}.html"
+    return templates.TemplateResponse(indexFile, {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "logo_url": logo_url})
 
-@router.post("/app/{extension}/search")
+@router.post("/{extension}/search")
 @limiter.limit(search_limit, key_func=get_rate_limit_key)
 def hotel_search(request: Request, extension: str, check_in: str = Form(...), check_out: str = Form(...), guests: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
     track_visitor(request, config.id, db)
     logo_path = f"static/uploads/{extension}_logo.png"
     logo_url = f"/{logo_path}" if os.path.exists(logo_path) else None
+    indexFile = f"index{config.theme_id}.html"
 
     try: c_in = datetime.strptime(check_in, "%Y-%m-%d"); c_out = datetime.strptime(check_out, "%Y-%m-%d")
-    except: return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Invalid dates.", "logo_url": logo_url})
+    except: return templates.TemplateResponse(indexFile, {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Invalid dates.", "logo_url": logo_url})
 
-    if c_out <= c_in: return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Check-out must be after check-in.", "logo_url": logo_url})
+    if c_out <= c_in: return templates.TemplateResponse(indexFile, {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": "Check-out must be after check-in.", "logo_url": logo_url})
     
     max_days = config.max_booking_days if config.max_booking_days is not None else 10
     if (c_out - c_in).days > max_days:
-        return templates.TemplateResponse("index.html", {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": f"Maximum booking length is {max_days} days.", "logo_url": logo_url})
+        return templates.TemplateResponse(indexFile, {"request": request, "config": config, "rooms": config.rooms, "hero_images": config.images, "error": f"Maximum booking length is {max_days} days.", "logo_url": logo_url})
 
     available_rooms = []
     for r in config.rooms:
@@ -86,7 +89,7 @@ def hotel_search(request: Request, extension: str, check_in: str = Form(...), ch
             available_rooms.append(r)
     return templates.TemplateResponse("search_results.html", {"request": request, "config": config, "rooms": available_rooms, "check_in": check_in, "check_out": check_out, "guests": guests, "logo_url": logo_url})
 
-@router.get("/app/{extension}/book/{room_id}")
+@router.get("/{extension}/book/{room_id}")
 def book_page(request: Request, extension: str, room_id: int, check_in: Optional[str] = None, check_out: Optional[str] = None, guests: int = 1, db: Session = Depends(get_db)):
     config = get_config(extension, db)
     logo_path = f"static/uploads/{extension}_logo.png"
@@ -97,7 +100,7 @@ def book_page(request: Request, extension: str, room_id: int, check_in: Optional
         check_in = now.strftime("%Y-%m-%d"); check_out = (now + timedelta(days=1)).strftime("%Y-%m-%d")
     return templates.TemplateResponse("booking.html", {"request": request, "config": config, "room": room, "prefill_check_in": check_in, "prefill_check_out": check_out, "prefill_guests": guests, "logo_url": logo_url})
 
-@router.post("/app/{extension}/book/confirm")
+@router.post("/{extension}/book/confirm")
 @limiter.limit(booking_limit, key_func=get_rate_limit_key)
 def book_confirm(request: Request, extension: str, room_id: int = Form(...), guest_name: str = Form(...), guest_email: Optional[str] = Form(None), guest_phone: Optional[str] = Form(None), check_in: str = Form(...), check_out: str = Form(...), rooms_needed: int = Form(1), guests_count: int = Form(1), db: Session = Depends(get_db)):
     config = get_config(extension, db)
@@ -132,7 +135,6 @@ def book_confirm(request: Request, extension: str, room_id: int = Form(...), gue
         room_type = db.query(models.RoomType).filter(models.RoomType.id == room_id).with_for_update().first()
 
         if not room_type:
-             # Should practically never happen if ID is valid, but good safety
              raise Exception("Room type not found")
 
         # 3. Check Availability (Inside Lock)

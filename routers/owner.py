@@ -3,14 +3,16 @@ from sqlalchemy.orm import Session
 from fastapi.responses import RedirectResponse, HTMLResponse
 import models
 from database import get_db
-from core import templates, verify_owner, log_activity, pwd_context, SECRET_KEY, ALGORITHM
+from core import templates, verify_owner, log_activity, pwd_context, SECRET_KEY, ALGORITHM, OWNER_HASH
 from jose import jwt, JWTError
 
 router = APIRouter()
 
 @router.get("/owner")
 def owner_dashboard(request: Request, db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
+    print('here')
     configs = db.query(models.SiteConfig).all(); msg = request.query_params.get("success")
+    print(configs)
     return templates.TemplateResponse("owner.html", {"request": request, "configs": configs, "msg": msg})
 
 @router.post("/owner/create_hotel")
@@ -44,9 +46,31 @@ def logout(request: Request, db=Depends(get_db)):
             pass
 
     # Choose a safe default destination
-    target = f"/app/{extension}/login" if extension else "/"
+    target = f"/{extension}/login" if extension else "/"
 
     response = RedirectResponse(url=target, status_code=303)
     response.delete_cookie("access_token", path="/")
     # response.delete_cookie("csrf_token", path="/")  # if you implement CSRF as above
     return response
+
+# --- NEW DELETE ROUTE ---
+@router.post("/owner/delete_hotel")
+def delete_hotel(config_id: int = Form(...), confirm_pass: str = Form(...), db: Session = Depends(get_db), auth: bool = Depends(verify_owner)):
+    # 1. Verify Owner Password
+    if not pwd_context.verify(confirm_pass, OWNER_HASH):
+        return RedirectResponse(url="/owner?error=Incorrect+Owner+Password", status_code=303)
+
+    # 2. Find Hotel
+    config = db.query(models.SiteConfig).filter(models.SiteConfig.id == config_id).first()
+    if not config:
+        return RedirectResponse(url="/owner?error=Hotel+Not+Found", status_code=303)
+
+    # 3. Delete Hotel (Cascades to all rooms, bookings, users, etc. due to models.py setup)
+    try:
+        hotel_name = config.hotel_name
+        db.delete(config)
+        db.commit()
+        return RedirectResponse(url=f"/owner?success=Deleted+{hotel_name}", status_code=303)
+    except Exception as e:
+        db.rollback()
+        return RedirectResponse(url="/owner?error=Delete+Failed", status_code=303)

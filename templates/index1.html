@@ -12,7 +12,7 @@
                     <h1 class="hero-title">{{ config.hotel_name }}</h1>
                     <p class="hero-desc">{{ config.highlights }}</p>
                     <button type="button" class="btn btn-outline-light mt-3 px-4 fw-bold rounded-pill" data-bs-toggle="modal" data-bs-target="#allPhotosModal">
-                        <i class="bi bi-grid-3x3-gap me-2"></i> View All Photos
+                        <i class="bi bi-grid-3x3-gap me-2"></i> عرض جميع الصور
                     </button>
                 </div>
             </div>
@@ -23,7 +23,7 @@
     <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next"><span class="carousel-control-next-icon"></span></button>
 </div>
 {% else %}
-<div class="container section-padding text-center"><h1>{{ config.hotel_name }}</h1><p>Welcome!</p></div>
+<div class="container section-padding text-center"><h1>{{ config.hotel_name }}</h1><p>مرحباً بكم!</p></div>
 {% endif %}
 
 {% if hero_images %}
@@ -31,8 +31,8 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title fw-bold">Photo Gallery</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title fw-bold">معرض الصور</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
       </div>
       <div class="modal-body bg-light">
         <div class="row g-3">
@@ -50,22 +50,22 @@
 
 <div class="search-section" id="search">
     <div class="container">
-        <form action="/app/{{ config.extension }}/search" method="post" class="search-card">
+        <form action="/{{ config.extension }}/search" method="post" class="search-card">
             <div class="row align-items-end g-3">
                 <div class="col-md-3">
-                    <label class="fw-bold mb-1">Check-In</label>
+                    <label class="fw-bold mb-1">تاريخ الوصول</label>
                     <input type="date" name="check_in" class="form-control" required>
                 </div>
                 <div class="col-md-3">
-                    <label class="fw-bold mb-1">Check-Out</label>
+                    <label class="fw-bold mb-1">تاريخ المغادرة</label>
                     <input type="date" name="check_out" class="form-control" required>
                 </div>
                 <div class="col-md-3">
-                    <label class="fw-bold mb-1">Guests</label>
+                    <label class="fw-bold mb-1">الضيوف</label>
                     <input type="number" name="guests" value="1" class="form-control">
                 </div>
                 <div class="col-md-3">
-                    <button class="btn btn-warning w-100 btn-warning-custom shadow-sm">Check Availability</button>
+                    <button class="btn btn-warning w-100 btn-warning-custom shadow-sm">تحقق من التوفر</button>
                 </div>
             </div>
         </form>
@@ -76,13 +76,13 @@
     <div class="container">
         <div class="content-card">
             <div class="card-body-custom">
-                <h3 class="section-title text-start mb-4">Availability Outlook</h3>
+                <h3 class="section-title text-start mb-4">نظرة عامة على التوفر</h3>
                 <div id='calendar-container'>
                     <div id='calendar'></div>
                 </div>
                 <div class="mt-2 text-center small text-muted">
-                    <span class="badge" style="background-color: #28a745; opacity: 0.6;">&nbsp;&nbsp;</span> Available
-                    <span class="badge ms-2" style="background-color: #dc3545; opacity: 0.6;">&nbsp;&nbsp;</span> Full
+                    <span class="badge" style="background-color: #28a745; opacity: 0.6;">&nbsp;&nbsp;</span> متاح
+                    <span class="badge ms-2" style="background-color: #dc3545; opacity: 0.6;">&nbsp;&nbsp;</span> محجوز بالكامل
                 </div>
             </div>
         </div>
@@ -91,7 +91,7 @@
 
 <div class="section-padding extra-top-padding" id="rooms">
     <div class="container">
-        <div class="text-center mb-5"><h2 class="section-title">Our Accommodations</h2></div>
+        <div class="text-center mb-5"><h2 class="section-title">أماكن الإقامة لدينا</h2></div>
         <div class="row">
             {% for room in rooms %}
             <div class="col-md-4 card-spacer">
@@ -122,15 +122,15 @@
                             <span class="badge bg-secondary"><i class="bi bi-people"></i> {{ room.capacity }}</span>
                         </div>
                         <p class="text-muted small flex-grow-1">{{ room.description|truncate(100) }}</p>
-                        <div class="price-tag mt-2">${{ room.price_per_night }} <small style="font-size: 0.6em; color: #777; font-weight: normal;">/night</small></div>
+                        <div class="price-tag mt-2">${{ room.price_per_night }} <small style="font-size: 0.6em; color: #777; font-weight: normal;">/ليلة</small></div>
                     </div>
                     <div class="card-footer-custom">
-                        <a href="/app/{{ config.extension }}/book/{{ room.id }}" class="btn-primary-custom">View Details & Book</a>
+                        <a href="/{{ config.extension }}/book/{{ room.id }}" class="btn-primary-custom">عرض التفاصيل والحجز</a>
                     </div>
                 </div>
             </div>
             {% else %}
-            <div class="col-12 text-center text-muted">No rooms available yet.</div>
+            <div class="col-12 text-center text-muted">لا توجد غرف متاحة حتى الآن.</div>
             {% endfor %}
         </div>
     </div>
@@ -140,19 +140,19 @@
     <div class="container">
         <div class="row">
             <div class="col-md-8">
-                <h3 class="section-title text-start">About Us</h3>
+                <h3 class="section-title text-start">معلومات عنا</h3>
                 <p class="lead" style="white-space: pre-line;">{{ config.about_description }}</p>
                 
                 {% if config.rules %}
                 <hr class="my-4">
-                <h4 class="mb-3">House Rules</h4>
+                <h4 class="mb-3">قواعد المكان</h4>
                 <div class="p-3 bg-white border rounded">
                     <p class="mb-0" style="white-space: pre-line;">{{ config.rules }}</p>
                 </div>
                 {% endif %}
 
                 <hr class="my-4">
-                <h4>Amenities</h4>
+                <h4>وسائل الراحة</h4>
                 <div class="row mt-3">
                     {% for am in config.amenities_list.split('\n') %}
                     {% if am.strip() %}
@@ -166,7 +166,7 @@
             <div class="col-md-4">
                 <div class="content-card">
                     <div class="card-body-custom">
-                        <h5>Contact Us</h5>
+                        <h5>تواصل معنا</h5>
                         <ul class="list-unstyled mt-3">
                             <li class="mb-2"><i class="bi bi-geo-alt-fill text-highlight"></i> {{ config.address }}</li>
                             <li class="mb-2"><i class="bi bi-envelope-fill text-highlight"></i> {{ config.contact_email }}</li>
@@ -187,11 +187,14 @@
 </div>
 
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/locales/ar.global.min.js'></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'multiMonthYear', 
+            locale: 'ar',
+            direction: 'rtl',
             views: {
                 multiMonthYear: {
                     type: 'multiMonthYear',
@@ -201,7 +204,7 @@
             },
             height: 'auto',
             headerToolbar: { left: 'prev', center: 'title', right: 'next' },
-            events: '/api/calendar_events'
+            events: '/{{ config.extension }}/api/calendar_events'
         });
         calendar.render();
     });

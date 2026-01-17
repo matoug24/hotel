@@ -3,10 +3,10 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Edit Booking #{{ booking.booking_code }}</h2>
-        <div><a href="/app/{{ config.extension }}/admin/invoice/{{ booking.id }}" target="_blank" class="btn btn-info text-white me-2"><i class="bi bi-printer"></i> Invoice</a><a href="/app/{{ config.extension }}/admin" class="btn btn-secondary">Back</a></div>
+        <div><a href="/{{ config.extension }}/admin/invoice/{{ booking.id }}" target="_blank" class="btn btn-info text-white me-2"><i class="bi bi-printer"></i> Invoice</a><a href="/{{ config.extension }}/admin" class="btn btn-secondary">Back</a></div>
     </div>
     <div class="card shadow p-4">
-        <form action="/app/{{ config.extension }}/admin/edit_booking/{{ booking.id }}" method="post">
+        <form action="/{{ config.extension }}/admin/edit_booking/{{ booking.id }}" method="post">
             <div class="row">
                 <div class="col-md-4 mb-3"><label>Guest Name</label><input type="text" name="guest_name" value="{{ booking.guest_name }}" class="form-control" required></div>
                 <div class="col-md-4 mb-3"><label>Phone</label><input type="text" name="guest_phone" value="{{ booking.guest_phone or '' }}" class="form-control"></div>
@@ -42,7 +42,7 @@
 
             <button class="btn btn-primary w-100">Save Changes</button>
         </form>
-        <hr class="my-4"><h5 class="text-danger">Danger Zone</h5><form action="/app/{{ config.extension }}/admin/delete_booking" method="post" onsubmit="return confirm('Are you sure?');"><input type="hidden" name="booking_id" value="{{ booking.id }}"><button class="btn btn-danger">Delete Booking</button></form>
+        <hr class="my-4"><h5 class="text-danger">Danger Zone</h5><form action="/{{ config.extension }}/admin/delete_booking" method="post" onsubmit="return confirm('Are you sure?');"><input type="hidden" name="booking_id" value="{{ booking.id }}"><button class="btn btn-danger">Delete Booking</button></form>
     </div>
 </div>
 {% endblock %}

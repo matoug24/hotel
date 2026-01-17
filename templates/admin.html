@@ -7,7 +7,7 @@
             <small class="text-muted">User: {{ user.username }}</small>
         </div>
         <div>
-            <a href="/app/{{ config.extension }}" class="btn btn-outline-primary me-2" target="_blank">View Site</a>
+            <a href="/{{ config.extension }}" class="btn btn-outline-primary me-2" target="_blank">View Site</a>
             <a href="/logout" class="btn btn-outline-danger" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
         </div>
     </div>
@@ -65,7 +65,7 @@
                                 <td>{{ b.room.name }}</td>
                                 <td>{{ b.status|upper }}</td>
                                 <td>${{ b.total_price }}</td>
-                                <td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
+                                <td><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -95,7 +95,7 @@
                                 <td>{{ b.room.name }} <span class="badge bg-light text-dark border">{{ b.assigned_unit.label if b.assigned_unit else '?' }}</span></td>
                                 <td>{{ b.check_out.date() }}</td>
                                 <td class="text-danger fw-bold">${{ b.total_price - b.deposit_amount }}</td>
-                                <td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-outline-primary">Manage</a></td>
+                                <td><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-outline-primary">Manage</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -106,32 +106,32 @@
 
         <div class="tab-pane fade" id="bookings">
             <div class="d-flex justify-content-end mb-4">
-                <a href="/app/{{ config.extension }}/admin/new_booking" class="btn btn-success"><i class="bi bi-plus-lg"></i> Create New Booking</a>
+                <a href="/{{ config.extension }}/admin/new_booking" class="btn btn-success"><i class="bi bi-plus-lg"></i> Create New Booking</a>
             </div>
             
             <div class="row g-4 mb-5">
                 <div class="col-md-3">
                     <div class="card h-100 shadow-sm border-primary">
                         <div class="card-header bg-primary text-white d-flex justify-content-between"><span>Check-In Today</span><span class="badge bg-white text-primary">{{ checkins_today_list|length }}</span></div>
-                        <ul class="list-group list-group-flush">{% for b in checkins_today_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a><br><small class="text-muted">{{ b.room.name }}</small></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                        <ul class="list-group list-group-flush">{% for b in checkins_today_list %}<li class="list-group-item"><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a><br><small class="text-muted">{{ b.room.name }}</small></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card h-100 shadow-sm border-success">
                         <div class="card-header bg-success text-white d-flex justify-content-between"><span>Check-Out Today</span><span class="badge bg-white text-success">{{ checkouts_today_list|length }}</span></div>
-                        <ul class="list-group list-group-flush">{% for b in checkouts_today_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a><br><small class="text-muted">{{ b.room.name }}</small></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                        <ul class="list-group list-group-flush">{% for b in checkouts_today_list %}<li class="list-group-item"><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a><br><small class="text-muted">{{ b.room.name }}</small></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card h-100 shadow-sm border-info">
                         <div class="card-header bg-info text-white d-flex justify-content-between"><span>Check-In Tomorrow</span><span class="badge bg-white text-info">{{ checkins_tomorrow_list|length }}</span></div>
-                        <ul class="list-group list-group-flush">{% for b in checkins_tomorrow_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                        <ul class="list-group list-group-flush">{% for b in checkins_tomorrow_list %}<li class="list-group-item"><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
                     </div>
                 </div>
                 <div class="col-md-3">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-secondary text-white d-flex justify-content-between"><span>Check-Out Tomorrow</span><span class="badge bg-white text-secondary">{{ checkouts_tomorrow_list|length }}</span></div>
-                        <ul class="list-group list-group-flush">{% for b in checkouts_tomorrow_list %}<li class="list-group-item"><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
+                        <ul class="list-group list-group-flush">{% for b in checkouts_tomorrow_list %}<li class="list-group-item"><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="text-decoration-none fw-bold">{{ b.guest_name }}</a></li>{% else %}<li class="list-group-item text-muted text-center">None</li>{% endfor %}</ul>
                     </div>
                 </div>
             </div>
@@ -153,7 +153,7 @@
                                 <td>{{ b.room.name }}</td>
                                 <td>{{ b.status|upper }}</td>
                                 <td>${{ b.total_price }}</td>
-                                <td><a href="/app/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
+                                <td><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -199,7 +199,7 @@
         {% endif %}
 
         <div class="tab-pane fade" id="maintenance">
-            <div class="row"><div class="col-md-4"><div class="card shadow-sm p-3"><h5>Block Unit</h5><form action="/app/{{ config.extension }}/admin/add_maintenance" method="post"><div class="mb-2"><label>Unit</label><select name="unit_id" class="form-select">{% for u in all_units %}<option value="{{ u.id }}">{{ u.room_type.name }} - {{ u.label }}</option>{% endfor %}</select></div><div class="mb-2"><label>Start</label><input type="date" name="start" class="form-control" required></div><div class="mb-2"><label>End</label><input type="date" name="end" class="form-control" required></div><div class="mb-2"><input type="text" name="reason" placeholder="Reason" class="form-control" required></div><button class="btn btn-danger w-100">Block</button></form></div></div><div class="col-md-8"><h5>Active Blocks</h5><table class="table table-bordered bg-white"><tr><th>Unit</th><th>Dates</th><th>Reason</th><th>Action</th></tr>{% for m in blocks %}<tr><td>{% if m.unit %}{{ m.unit.room_type.name }} - {{ m.unit.label }}{% else %}Generic{% endif %}</td><td>{{ m.start_date }} to {{ m.end_date }}</td><td>{{ m.reason }}</td><td><form action="/app/{{ config.extension }}/admin/delete_maintenance" method="post"><input type="hidden" name="block_id" value="{{ m.id }}"><button class="btn btn-sm btn-outline-danger">Unblock</button></form></td></tr>{% endfor %}</table></div></div>
+            <div class="row"><div class="col-md-4"><div class="card shadow-sm p-3"><h5>Block Unit</h5><form action="/{{ config.extension }}/admin/add_maintenance" method="post"><div class="mb-2"><label>Unit</label><select name="unit_id" class="form-select">{% for u in all_units %}<option value="{{ u.id }}">{{ u.room_type.name }} - {{ u.label }}</option>{% endfor %}</select></div><div class="mb-2"><label>Start</label><input type="date" name="start" class="form-control" required></div><div class="mb-2"><label>End</label><input type="date" name="end" class="form-control" required></div><div class="mb-2"><input type="text" name="reason" placeholder="Reason" class="form-control" required></div><button class="btn btn-danger w-100">Block</button></form></div></div><div class="col-md-8"><h5>Active Blocks</h5><table class="table table-bordered bg-white"><tr><th>Unit</th><th>Dates</th><th>Reason</th><th>Action</th></tr>{% for m in blocks %}<tr><td>{% if m.unit %}{{ m.unit.room_type.name }} - {{ m.unit.label }}{% else %}Generic{% endif %}</td><td>{{ m.start_date }} to {{ m.end_date }}</td><td>{{ m.reason }}</td><td><form action="/{{ config.extension }}/admin/delete_maintenance" method="post"><input type="hidden" name="block_id" value="{{ m.id }}"><button class="btn btn-sm btn-outline-danger">Unblock</button></form></td></tr>{% endfor %}</table></div></div>
         </div>
 
         <div class="tab-pane fade" id="rooms">
@@ -207,7 +207,7 @@
                 <div class="col-md-4 border-end">
                     <div class="card shadow-sm p-3">
                         <h4>Add Room Type</h4>
-                        <form action="/app/{{ config.extension }}/admin/add_room" method="post" enctype="multipart/form-data">
+                        <form action="/{{ config.extension }}/admin/add_room" method="post" enctype="multipart/form-data">
                             <div class="mb-2"><input type="text" name="name" placeholder="Name" class="form-control" required></div>
                             <div class="mb-2"><input type="number" step="0.01" name="price" placeholder="Price" class="form-control" required></div>
                             <div class="row"><div class="col-6 mb-2"><input type="number" name="qty" placeholder="Qty" class="form-control" required></div><div class="col-6 mb-2"><input type="number" name="capacity" placeholder="Cap" class="form-control" required></div></div>
@@ -233,8 +233,8 @@
                                 </div>
                             </div>
                             <div class="d-flex gap-2">
-                                <a href="/app/{{ config.extension }}/admin/edit_room/{{ r.id }}" class="btn btn-sm btn-outline-primary">Edit</a>
-                                <form action="/app/{{ config.extension }}/admin/delete_room" method="post" onsubmit="return confirm('Are you sure? This cannot be undone.')">
+                                <a href="/{{ config.extension }}/admin/edit_room/{{ r.id }}" class="btn btn-sm btn-outline-primary">Edit</a>
+                                <form action="/{{ config.extension }}/admin/delete_room" method="post" onsubmit="return confirm('Are you sure? This cannot be undone.')">
                                     <input type="hidden" name="room_id" value="{{ r.id }}">
                                     <button class="btn btn-sm btn-outline-danger">Delete</button>
                                 </form>
@@ -250,7 +250,7 @@
             <div class="row">
                 <div class="col-md-4"><div class="card shadow-sm p-3">
                     <h5>Add Season</h5>
-                    <form action="/app/{{ config.extension }}/admin/add_season" method="post">
+                    <form action="/{{ config.extension }}/admin/add_season" method="post">
                         <div class="mb-2"><input type="text" name="name" placeholder="Name" class="form-control" required></div>
                         <div class="mb-2"><label>Start</label><input type="date" name="start" class="form-control" required></div>
                         <div class="mb-2"><label>End</label><input type="date" name="end" class="form-control" required></div>
@@ -259,7 +259,7 @@
                         <button class="btn btn-success w-100">Save</button>
                     </form>
                 </div></div>
-                <div class="col-md-8"><h5>Rules</h5><table class="table table-bordered bg-white"><tr><th>Name</th><th>Scope</th><th>Dates</th><th>Multiplier</th><th>Action</th></tr>{% for s in seasons %}<tr><td>{{ s.name }}</td><td>{{ s.room.name if s.room else 'Global' }}</td><td>{{ s.start_date }} to {{ s.end_date }}</td><td>x{{ s.multiplier }}</td><td><form action="/app/{{ config.extension }}/admin/delete_season" method="post"><input type="hidden" name="season_id" value="{{ s.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form></td></tr>{% endfor %}</table></div>
+                <div class="col-md-8"><h5>Rules</h5><table class="table table-bordered bg-white"><tr><th>Name</th><th>Scope</th><th>Dates</th><th>Multiplier</th><th>Action</th></tr>{% for s in seasons %}<tr><td>{{ s.name }}</td><td>{{ s.room.name if s.room else 'Global' }}</td><td>{{ s.start_date }} to {{ s.end_date }}</td><td>x{{ s.multiplier }}</td><td><form action="/{{ config.extension }}/admin/delete_season" method="post"><input type="hidden" name="season_id" value="{{ s.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form></td></tr>{% endfor %}</table></div>
             </div>
         </div>
 
@@ -268,7 +268,7 @@
                 <div class="col-md-4">
                     <div class="card shadow-sm p-4">
                         <h5>Create New Staff</h5>
-                        <form action="/app/{{ config.extension }}/admin/add_user" method="post">
+                        <form action="/{{ config.extension }}/admin/add_user" method="post">
                             <div class="mb-3"><label>Username</label><input type="text" name="username" class="form-control" required></div>
                             <div class="mb-3"><label>Password</label><input type="password" name="password" class="form-control" required></div>
                             <button class="btn btn-success w-100">Create User</button>
@@ -279,14 +279,14 @@
                     <h5>User Management</h5>
                     <table class="table table-bordered bg-white align-middle">
                         <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
-                        <tbody>{% for u in hotel_users %}<tr><td>{{ u.username }}</td><td><span class="badge bg-secondary">{{ u.role }}</span></td><td><div class="d-flex gap-2"><form action="/app/{{ config.extension }}/admin/delete_user" method="post" onsubmit="return confirm('Delete this user?');"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form><button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#pwdModal{{ u.id }}">Change Pass</button></div><div class="modal fade" id="pwdModal{{ u.id }}" tabindex="-1"><div class="modal-dialog"><form class="modal-content" action="/app/{{ config.extension }}/admin/update_user_password" method="post"><div class="modal-header"><h5 class="modal-title">Change Password for {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="user_id" value="{{ u.id }}"><label>New Password</label><input type="password" name="new_password" class="form-control" required></div><div class="modal-footer"><button class="btn btn-primary">Update</button></div></form></div></div></td></tr>{% endfor %}</tbody>
+                        <tbody>{% for u in hotel_users %}<tr><td>{{ u.username }}</td><td><span class="badge bg-secondary">{{ u.role }}</span></td><td><div class="d-flex gap-2"><form action="/{{ config.extension }}/admin/delete_user" method="post" onsubmit="return confirm('Delete this user?');"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form><button type="button" class="btn btn-sm btn-outline-warning text-dark" data-bs-toggle="modal" data-bs-target="#pwdModal{{ u.id }}">Change Pass</button></div><div class="modal fade" id="pwdModal{{ u.id }}" tabindex="-1"><div class="modal-dialog"><form class="modal-content" action="/{{ config.extension }}/admin/update_user_password" method="post"><div class="modal-header"><h5 class="modal-title">Change Password for {{ u.username }}</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><input type="hidden" name="user_id" value="{{ u.id }}"><label>New Password</label><input type="password" name="new_password" class="form-control" required></div><div class="modal-footer"><button class="btn btn-primary">Update</button></div></form></div></div></td></tr>{% endfor %}</tbody>
                     </table>
                 </div>
             </div>
         </div>
 
         <div class="tab-pane fade" id="site">
-             <form action="/app/{{ config.extension }}/admin/update_site" method="post">
+             <form action="/{{ config.extension }}/admin/update_site" method="post">
                 <div class="card shadow-sm p-4 mb-4 bg-light border-warning"><h5 class="text-warning">Site Status</h5><div class="form-check form-switch"><input class="form-check-input" type="checkbox" id="siteActive" name="is_active" value="true" {% if config.is_active %}checked{% endif %}><label class="form-check-label fw-bold" for="siteActive">Site is Online</label></div></div>
                 <div class="row">
                     <div class="col-md-12 mb-3"><label class="fw-bold">Website Theme</label>
@@ -339,21 +339,21 @@
             <h4>Hotel Logo</h4>
             <div class="card p-3 mb-4 shadow-sm bg-light">
                 <div class="d-flex align-items-end gap-3">
-                    <form action="/app/{{ config.extension }}/admin/upload_logo" method="post" enctype="multipart/form-data" class="d-flex gap-2 flex-grow-1 align-items-end">
+                    <form action="/{{ config.extension }}/admin/upload_logo" method="post" enctype="multipart/form-data" class="d-flex gap-2 flex-grow-1 align-items-end">
                         <div class="w-100">
                             <label class="form-label">Upload Hotel Logo (Will be resized to 75px height)</label>
                             <input type="file" name="logo" class="form-control" required accept="image/*">
                         </div>
                         <button class="btn btn-dark">Upload</button>
                     </form>
-                    <form action="/app/{{ config.extension }}/admin/delete_logo" method="post" onsubmit="return confirm('Are you sure you want to remove the logo?');">
+                    <form action="/{{ config.extension }}/admin/delete_logo" method="post" onsubmit="return confirm('Are you sure you want to remove the logo?');">
                         <button class="btn btn-danger">Delete Logo</button>
                     </form>
                 </div>
             </div>
 
             <h4 class="mt-4">Website Main Slider Photos</h4>
-            <form action="/app/{{ config.extension }}/admin/upload_hero" method="post" enctype="multipart/form-data" class="mb-4 d-flex gap-2">
+            <form action="/{{ config.extension }}/admin/upload_hero" method="post" enctype="multipart/form-data" class="mb-4 d-flex gap-2">
                 <input type="file" name="images" class="form-control w-50" multiple required>
                 <button class="btn btn-success">Upload Photos</button>
             </form>
@@ -361,7 +361,7 @@
                 {% for img in hero_images %}
                 <div class="col-md-3 mb-3 text-center">
                     <img src="{{ img.image_url }}" class="img-thumbnail" style="height: 150px; object-fit: cover;">
-                    <form action="/app/{{ config.extension }}/admin/delete_hero" method="post" class="mt-2">
+                    <form action="/{{ config.extension }}/admin/delete_hero" method="post" class="mt-2">
                         <input type="hidden" name="img_id" value="{{ img.id }}">
                         <button class="btn btn-sm btn-danger">Delete</button>
                     </form>
@@ -414,7 +414,7 @@
         var container = document.getElementById('visualization');
         if(!container) return;
         container.innerHTML = ''; 
-        fetch('/app/{{ config.extension }}/admin/api/tape_chart')
+        fetch('/{{ config.extension }}/admin/api/tape_chart')
             .then(response => response.json())
             .then(data => {
                 container.innerHTML = '';
@@ -430,7 +430,7 @@
                     if (properties.items.length > 0) {
                         var bookingId = properties.items[0]; 
                         if (String(bookingId).startsWith('maint_')) return;
-                        window.location.href = '/app/{{ config.extension }}/admin/edit_booking/' + bookingId;
+                        window.location.href = '/{{ config.extension }}/admin/edit_booking/' + bookingId;
                     }
                 });
             });
