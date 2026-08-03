@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Float, Date, Boolean, UniqueConstraint, true, false
 from sqlalchemy.orm import relationship
 from core import get_current_time 
 from database import Base
@@ -7,6 +7,7 @@ class SiteConfig(Base):
     __tablename__ = "site_config"
     id = Column(Integer, primary_key=True, index=True)
     extension = Column(String, unique=True, index=True)
+    site_type = Column(String, server_default="hotel", nullable=False)
     hotel_name = Column(String, default="Azure Horizon Beach Hotel")
     highlights = Column(String, default="Experience paradise.")
     about_description = Column(Text, default="Welcome to Azure Horizon.")
@@ -24,7 +25,6 @@ class SiteConfig(Base):
     booking_expiration_hours = Column(Integer, default=24)
     booking_success_message = Column(Text, default="Please contact us within 24 hours to confirm your reservation.")
     
-    # --- NEW SETTINGS ---
     max_booking_days = Column(Integer, default=10)
     max_rooms_per_booking = Column(Integer, default=2)
     
@@ -63,6 +63,11 @@ class RoomType(Base):
     price_per_night = Column(Float)
     total_quantity = Column(Integer)
     capacity = Column(Integer, default=2)
+    
+    # New columns for Hall logic
+    is_system_locked = Column(Boolean, server_default=false(), nullable=False)
+    is_active = Column(Boolean, server_default=true(), nullable=False)
+    
     config = relationship("SiteConfig", back_populates="rooms")
     images = relationship("RoomImage", back_populates="room", cascade="all, delete-orphan")
     units = relationship("RoomUnit", back_populates="room_type", cascade="all, delete-orphan")
@@ -98,7 +103,6 @@ class Booking(Base):
     rooms_booked = Column(Integer, default=1)
     guests_count = Column(Integer, default=1)
     status = Column(String, default="pending") 
-    # created_at = Column(DateTime, default=get_current_time)
     created_at = Column(DateTime(timezone=True), default=get_current_time)
     total_price = Column(Float, default=0.0)
     deposit_amount = Column(Float, default=0.0)

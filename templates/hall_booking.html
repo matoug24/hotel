@@ -1,0 +1,66 @@
+{% extends "base_public.html" %}
+{% block content %}
+<div class="container section-padding">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="content-card p-4">
+                <h3 class="section-title text-start mb-4">تأكيد حجز القاعة</h3>
+                
+                <div class="d-flex align-items-center mb-4 bg-light p-3 rounded">
+                    {% if room.images %}
+                    <img src="{{ room.images[0].image_url }}" class="rounded me-3" style="width: 80px; height: 80px; object-fit: cover;">
+                    {% endif %}
+                    <div>
+                        <h5 class="fw-bold mb-1">{{ room.name }}</h5>
+                        <div class="text-success fw-bold">${{ room.price_per_night }} <small class="text-dark fw-normal">/ للفترة</small></div>
+                    </div>
+                </div>
+
+                {% if error %}
+                <div class="alert alert-danger">{{ error }}</div>
+                {% endif %}
+
+                <form action="/{{ config.extension }}/book/confirm" method="post" id="bookingForm">
+                    <input type="hidden" name="room_id" value="{{ room.id }}">
+                    <input type="hidden" name="extension" value="{{ config.extension }}">
+                    <input type="hidden" name="check_in" value="{{ check_in }}">
+                    <input type="hidden" name="check_out" value="{{ check_out }}">
+                    <input type="hidden" name="rooms_needed" value="1">
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-muted small">التاريخ المختار</label>
+                        <div class="form-control bg-light fs-5">{{ display_date }}</div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-muted small">الوقت (الفترة)</label>
+                        <div class="form-control bg-light fs-5 text-primary fw-bold">{{ display_time }}</div>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">الاسم الكامل (صاحب الحجز)</label>
+                        <input type="text" name="guest_name" class="form-control" required placeholder="الاسم الثلاثي">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">رقم الهاتف</label>
+                        <input type="text" name="guest_phone" class="form-control" required placeholder="09XXXXXXXX">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">البريد الإلكتروني (اختياري)</label>
+                        <input type="email" name="guest_email" class="form-control">
+                    </div>
+
+                    <input type="hidden" name="guests_count" value="100">
+
+                    <button type="submit" class="btn btn-success w-100 py-3 fw-bold shadow-sm">إتمام الحجز</button>
+                    <div class="text-center mt-3">
+                        <a href="/{{ config.extension }}" class="text-muted small text-decoration-none">إلغاء والعودة</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

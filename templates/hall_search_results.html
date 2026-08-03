@@ -1,0 +1,46 @@
+{% extends "base_public.html" %}
+{% block content %}
+<div class="container section-padding">
+    <h2 class="section-title">نتائج البحث</h2>
+    <div class="alert alert-info text-center mb-5">
+        التوفر ليوم <strong>{{ booking_date }}</strong> - <strong>{{ 'الفترة الصباحية' if session_type == 'Morning' else 'الفترة المسائية' }}</strong>
+    </div>
+
+    <div class="row justify-content-center">
+        {% for room in rooms %}
+        <div class="col-md-5 card-spacer">
+            <div class="content-card h-100">
+                {% if room.images %}
+                <img src="{{ room.images[0].image_url }}" class="room-img" style="height: 250px;">
+                {% else %}
+                <img src="https://via.placeholder.com/400x250?text=No+Image" class="room-img" style="height: 250px;">
+                {% endif %}
+                
+                <div class="card-body-custom d-flex flex-column text-center">
+                    <h4 class="mb-2 fw-bold">{{ room.name }}</h4>
+                    <span class="badge bg-primary align-self-center mb-3">{{ session_type }} Session</span>
+                    
+                    <p class="text-muted">{{ room.description }}</p>
+                    
+                    <div class="my-3">
+                        <h3 class="text-success fw-bold">${{ room.dynamic_total }}</h3>
+                        <small class="text-muted">السعر الإجمالي</small>
+                    </div>
+                    
+                    <a href="/{{ config.extension }}/book/{{ room.id }}?check_in={{ check_in_iso }}&check_out={{ check_out_iso }}" class="btn-primary-custom mt-auto w-100">حجز الآن</a>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12 text-center">
+            <div class="py-5">
+                <i class="bi bi-calendar-x text-muted" style="font-size: 3rem;"></i>
+                <h4 class="text-muted mt-3">عذراً، هذه القترة غير متاحة.</h4>
+                <p>قد تكون محجوزة مسبقاً.</p>
+                <a href="/{{ config.extension }}" class="btn btn-secondary mt-3">اختر يوماً أو فترة أخرى</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

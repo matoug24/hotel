@@ -8,7 +8,6 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <link href="/static/css/theme{{ config.theme_id if config.theme_id else 1 }}.css?v=37.5" rel="stylesheet">
     <style>
-        /* Ensure font supports Arabic nicely */
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
     </style>
 </head>
@@ -29,7 +28,11 @@
             <div class="collapse navbar-collapse justify-content-end" id="navbarNav">
                 <ul class="navbar-nav">
                     <li class="nav-item"><a class="nav-link" href="/{{ config.extension }}#search">بحث</a></li>
-                    <li class="nav-item"><a class="nav-link" href="/{{ config.extension }}#rooms">الغرف</a></li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/{{ config.extension }}#rooms">
+                            {{ 'القاعات' if config.site_type == 'hall' else 'الغرف' }}
+                        </a>
+                    </li>
                     <li class="nav-item"><a class="nav-link" href="/{{ config.extension }}#info">معلومات</a></li>
                     <li class="nav-item"><a class="nav-link" href="/{{ config.extension }}#contact">تواصل معنا</a></li>
                 </ul>

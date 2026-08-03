@@ -16,38 +16,45 @@
         {% if error %}<div class="alert alert-danger">{{ error }}</div>{% endif %}
         
         <div class="card p-4 mb-5 shadow-sm">
-            <h4><i class="bi bi-plus-circle"></i> Create New Hotel</h4>
-            <form action="/owner/create_hotel" method="post" class="mt-3">
+            <h4><i class="bi bi-plus-circle"></i> Create New Site</h4>
+            <form action="/owner/create_site" method="post" class="mt-3">
                 <div class="row">
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">Type</label>
+                        <select name="site_type" class="form-select">
+                            <option value="hotel">Hotel</option>
+                            <option value="hall">Event Hall</option>
+                        </select>
+                    </div>
                     <div class="col-md-3 mb-3">
                         <label class="form-label">Extension (URL Slug)</label>
                         <input type="text" name="extension" class="form-control" placeholder="e.g. hotel1" required>
                     </div>
                     <div class="col-md-3 mb-3">
-                        <label class="form-label">Hotel Name</label>
+                        <label class="form-label">Site Name</label>
                         <input type="text" name="name" class="form-control" placeholder="Grand Hotel" required>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Admin Password</label>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">Admin Pass</label>
                         <input type="text" name="admin_pass" class="form-control" required>
                     </div>
-                    <div class="col-md-3 mb-3">
-                        <label class="form-label">Staff Password</label>
+                    <div class="col-md-2 mb-3">
+                        <label class="form-label">Staff Pass</label>
                         <input type="text" name="user_pass" class="form-control" required>
                     </div>
                 </div>
-                <button class="btn btn-primary">Create Hotel</button>
+                <button class="btn btn-primary">Create Site</button>
             </form>
         </div>
         
-        <h4><i class="bi bi-building"></i> Active Hotels ({{ configs|length }})</h4>
+        <h4><i class="bi bi-building"></i> Active Sites ({{ configs|length }})</h4>
         <div class="card shadow-sm">
             <div class="card-body p-0">
                 <table class="table table-hover mb-0 align-middle">
                     <thead class="table-light">
                         <tr>
                             <th>ID</th>
-                            <th>Name</th>
+                            <th>Type</th> <th>Name</th>
                             <th>Public Link</th>
                             <th>Admin Link</th>
                             <th style="min-width: 300px;">Actions</th>
@@ -57,6 +64,13 @@
                         {% for c in configs %}
                         <tr>
                             <td>#{{ c.id }}</td>
+                            <td>
+                                {% if c.site_type == 'hall' %}
+                                    <span class="badge bg-info text-dark">Hall</span>
+                                {% else %}
+                                    <span class="badge bg-primary">Hotel</span>
+                                {% endif %}
+                            </td>
                             <td><strong>{{ c.hotel_name }}</strong></td>
                             <td><a href="/{{ c.extension }}" target="_blank">/{{ c.extension }}</a></td>
                             <td><a href="/{{ c.extension }}/admin" target="_blank" class="btn btn-sm btn-outline-secondary">Admin Login</a></td>
@@ -85,7 +99,7 @@
                                             </div>
                                             <form action="/owner/delete_hotel" method="post">
                                                 <div class="modal-body">
-                                                    <p>This will permanently delete the hotel, all bookings, and all history. This cannot be undone.</p>
+                                                    <p>This will permanently delete the site, all bookings, and all history. This cannot be undone.</p>
                                                     <input type="hidden" name="config_id" value="{{ c.id }}">
                                                     <div class="mb-3">
                                                         <label class="form-label fw-bold">Enter Owner Password to Confirm:</label>
@@ -104,7 +118,7 @@
                             </td>
                         </tr>
                         {% else %}
-                        <tr><td colspan="5" class="text-center p-4">No hotels created yet.</td></tr>
+                        <tr><td colspan="6" class="text-center p-4">No sites created yet.</td></tr>
                         {% endfor %}
                     </tbody>
                 </table>

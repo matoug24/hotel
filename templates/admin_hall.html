@@ -1,0 +1,324 @@
+{% extends "base_admin.html" %}
+{% block content %}
+<div class="container-fluid p-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 text-dark">{{ config.hotel_name }} (Hall Admin)</h1>
+            <small class="text-muted">User: {{ user.username }} | Role: {{ user.role }}</small>
+        </div>
+        <div>
+            <a href="/{{ config.extension }}" class="btn btn-outline-primary me-2" target="_blank">View Site</a>
+            <a href="/logout" class="btn btn-outline-danger" title="Logout"><i class="bi bi-box-arrow-right"></i></a>
+        </div>
+    </div>
+    
+    {% if msg %}<div class="alert alert-success">{{ msg }}</div>{% endif %}
+    {% if err %}<div class="alert alert-danger">{{ err }}</div>{% endif %}
+
+    <ul class="nav nav-pills mb-4" id="adminTabs">
+        <li class="nav-item"><a class="nav-link active" id="tab-calendar" data-bs-toggle="pill" href="#calendar">Dashboard & Calendar</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-requests" data-bs-toggle="pill" href="#requests">Requests <span class="badge bg-warning text-dark">{{ new_requests_count }}</span></a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-bookings" data-bs-toggle="pill" href="#bookings">Confirmed Events</a></li>
+        
+        {% if user.role == 'admin' %}
+        <li class="nav-item"><a class="nav-link" id="tab-rooms" data-bs-toggle="pill" href="#rooms">Edit Venues</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-users" data-bs-toggle="pill" href="#users">Users</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-site" data-bs-toggle="pill" href="#site">Site Settings</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-hero" data-bs-toggle="pill" href="#hero">Photos</a></li>
+        <li class="nav-item"><a class="nav-link" id="tab-logs" data-bs-toggle="pill" href="#logs">Logs</a></li>
+        {% endif %}
+    </ul>
+
+    <div class="tab-content border-top pt-4">
+        <div class="tab-pane fade show active" id="calendar">
+            <div class="row mb-4">
+                <div class="col-md-12 mb-2"><h5 class="text-muted">Venue Status</h5></div>
+                {% for r in rooms %}
+                <div class="col-md-6">
+                    <div class="card shadow-sm border-start border-4 {{ 'border-success' if r.is_active else 'border-danger' }}">
+                        <div class="card-body d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-0 fw-bold">{{ r.name }}</h6>
+                                <small class="text-muted">${{ r.price_per_night }} / session</small>
+                            </div>
+                            <span class="badge {{ 'bg-success' if r.is_active else 'bg-danger' }}">
+                                {{ 'ONLINE' if r.is_active else 'OFFLINE' }}
+                            </span>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="col-12"><div class="alert alert-danger">No venues found. Please recreate this site in the Owner Dashboard.</div></div>
+                {% endfor %}
+            </div>
+
+            <div class="row mb-4">
+                <div class="col-md-4"><div class="card shadow-sm"><div class="card-body text-center"><h6 class="text-muted text-uppercase small">Pending Requests</h6><h2 class="display-6 text-warning">{{ new_requests_count }}</h2></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm"><div class="card-body text-center"><h6 class="text-muted text-uppercase small">Events Today</h6><h2 class="display-6 text-primary">{{ events_today|length }}</h2></div></div></div>
+                <div class="col-md-4"><div class="card shadow-sm"><div class="card-body text-center"><h6 class="text-muted text-uppercase small">Est. Revenue (Month)</h6><h2 class="display-6 text-success">${{ financials.revenue_month }}</h2></div></div></div>
+            </div>
+            
+            <div class="card shadow-sm">
+                <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Booking Calendar</h5>
+                    <a href="/{{ config.extension }}/admin/new_booking" class="btn btn-success btn-sm"><i class="bi bi-plus"></i> New Admin Booking</a>
+                </div>
+                <div class="card-body p-2">
+                    <div id="calendarView" style="min-height: 600px;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="requests">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="mb-3 text-warning">Pending Booking Requests</h5>
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light"><tr><th>Guest</th><th>Date</th><th>Session</th><th>Venue</th><th>Total</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for b in request_bookings %}
+                            <tr>
+                                <td><strong>{{ b.guest_name }}</strong><br><small class="text-muted">{{ b.guest_phone }}</small></td>
+                                <td>{{ b.check_in.strftime('%Y-%m-%d') }}</td>
+                                <td><span class="badge {{ 'bg-warning text-dark' if b.check_in.hour < 12 else 'bg-dark' }}">{{ 'Morning' if b.check_in.hour < 12 else 'Evening' }}</span></td>
+                                <td>{{ b.room.name }}</td>
+                                <td>${{ b.total_price }}</td>
+                                <td><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-dark">Manage</a></td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="text-center text-muted p-4">No pending requests.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="bookings">
+             <div class="card shadow-sm">
+                <div class="card-body">
+                    <h5 class="mb-3 text-success">Confirmed Events</h5>
+                    <table class="table table-hover align-middle" id="tableBookings">
+                        <thead class="table-light"><tr><th>Date</th><th>Session</th><th>Guest</th><th>Venue</th><th>Status</th><th>Total</th><th>Action</th></tr></thead>
+                        <tbody>
+                            {% for b in upcoming_bookings %}
+                            <tr>
+                                <td>{{ b.check_in.strftime('%Y-%m-%d') }}</td>
+                                <td><span class="badge {{ 'bg-warning text-dark' if b.check_in.hour < 12 else 'bg-dark' }}">{{ 'Morning' if b.check_in.hour < 12 else 'Evening' }}</span></td>
+                                <td>{{ b.guest_name }}</td>
+                                <td>{{ b.room.name }}</td>
+                                <td><span class="badge bg-success">CONFIRMED</span></td>
+                                <td>${{ b.total_price }}</td>
+                                <td><a href="/{{ config.extension }}/admin/edit_booking/{{ b.id }}" class="btn btn-sm btn-outline-primary">Edit</a></td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="rooms">
+            <div class="row">
+                <div class="col-md-12">
+                    <div class="alert alert-info">
+                        <i class="bi bi-info-circle"></i> <strong>How it works:</strong> Your hall has two fixed "Rooms" (Morning & Evening). You can disable one if you don't offer that session, or edit the price and description.
+                    </div>
+                    <div class="row">
+                        {% for r in rooms %}
+                        <div class="col-md-6 mb-4">
+                            <div class="card h-100 shadow-sm {{ 'border-success' if r.is_active else 'border-secondary' }}">
+                                <div class="card-header d-flex justify-content-between align-items-center bg-white">
+                                    <h5 class="mb-0">{{ r.name }}</h5>
+                                    <span class="badge {{ 'bg-success' if r.is_active else 'bg-secondary' }}">{{ 'ACTIVE' if r.is_active else 'INACTIVE' }}</span>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted">{{ r.description }}</p>
+                                    <ul class="list-unstyled">
+                                        <li><strong>Price:</strong> ${{ r.price_per_night }}</li>
+                                        <li><strong>Capacity:</strong> {{ r.capacity }} guests</li>
+                                    </ul>
+                                    <div class="d-grid gap-2 d-md-flex mt-3">
+                                        <a href="/{{ config.extension }}/admin/edit_room/{{ r.id }}" class="btn btn-primary flex-grow-1">Edit Details</a>
+                                        
+                                        <form action="/{{ config.extension }}/admin/toggle_room_active" method="post" class="flex-grow-1">
+                                            <input type="hidden" name="room_id" value="{{ r.id }}">
+                                            <input type="hidden" name="is_active" value="{{ 'false' if r.is_active else 'true' }}">
+                                            <button class="btn {{ 'btn-outline-danger' if r.is_active else 'btn-success' }} w-100">
+                                                {{ 'Disable' if r.is_active else 'Enable' }}
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% else %}
+                        <div class="col-12"><div class="alert alert-danger">No venues found in database.</div></div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="users">
+            <div class="row">
+                <div class="col-md-4">
+                    <div class="card shadow-sm p-4">
+                        <h5>Create New Staff</h5>
+                        <form action="/{{ config.extension }}/admin/add_user" method="post">
+                            <div class="mb-3"><label>Username</label><input type="text" name="username" class="form-control" required></div>
+                            <div class="mb-3"><label>Password</label><input type="password" name="password" class="form-control" required></div>
+                            <button class="btn btn-success w-100">Create User</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="col-md-8">
+                    <h5>User Management</h5>
+                    <table class="table table-bordered bg-white align-middle">
+                        <thead><tr><th>Username</th><th>Role</th><th>Actions</th></tr></thead>
+                        <tbody>{% for u in hotel_users %}<tr><td>{{ u.username }}</td><td><span class="badge bg-secondary">{{ u.role }}</span></td><td><div class="d-flex gap-2"><form action="/{{ config.extension }}/admin/delete_user" method="post" onsubmit="return confirm('Delete this user?');"><input type="hidden" name="user_id" value="{{ u.id }}"><button class="btn btn-sm btn-outline-danger">Delete</button></form></div></td></tr>{% endfor %}</tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="tab-pane fade" id="site">
+             <form action="/{{ config.extension }}/admin/update_site" method="post">
+                <div class="card shadow-sm p-4 mb-4 bg-light border-warning">
+                    <div class="row align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="text-warning mb-0">Site Availability</h5>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <div class="form-check form-switch d-inline-block">
+                                <input class="form-check-input" type="checkbox" id="siteActive" name="is_active" value="true" {% if config.is_active %}checked{% endif %}>
+                                <label class="form-check-label fw-bold" for="siteActive">Site Online</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3">
+                    <div class="col-md-12"><h5 class="text-primary border-bottom pb-2">General Information</h5></div>
+                    
+                    <div class="col-md-8">
+                        <label class="form-label">Hall Name</label>
+                        <input type="text" name="hotel_name" class="form-control" value="{{ config.hotel_name }}" required>
+                    </div>
+                    <div class="col-md-4">
+                         <label class="form-label">Theme</label>
+                        <select name="theme_id" class="form-select">
+                            <option value="1" {% if config.theme_id == 1 %}selected{% endif %}>Standard Blue</option>
+                            <option value="2" {% if config.theme_id == 2 %}selected{% endif %}>Sunset Luxury</option>
+                        </select>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Main Tagline (Hero Text)</label>
+                        <input type="text" name="highlights" class="form-control" value="{{ config.highlights }}">
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">About Description</label>
+                        <textarea name="about_description" class="form-control" rows="3">{{ config.about_description }}</textarea>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Amenities (One per line)</label>
+                        <textarea name="amenities_list" class="form-control" rows="4">{{ config.amenities_list }}</textarea>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Hall Rules</label>
+                        <textarea name="rules" class="form-control" rows="3">{{ config.rules }}</textarea>
+                    </div>
+
+                    <div class="col-md-12">
+                        <label class="form-label">Booking Success Message</label>
+                        <textarea name="booking_success_message" class="form-control" rows="2">{{ config.booking_success_message }}</textarea>
+                    </div>
+
+                    <div class="col-md-12"><h5 class="text-primary border-bottom pb-2 mt-4">Contact Details</h5></div>
+                    
+                    <div class="col-md-6">
+                        <label class="form-label">Email</label>
+                        <input type="email" name="email" class="form-control" value="{{ config.contact_email }}">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label">Phone</label>
+                        <input type="text" name="phone" class="form-control" value="{{ config.contact_phone }}">
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">Address</label>
+                        <input type="text" name="address" class="form-control" value="{{ config.address }}">
+                    </div>
+                    <div class="col-md-12">
+                        <label class="form-label">Google Maps Embed URL</label>
+                        <input type="text" name="map_url" class="form-control" value="{{ config.map_url }}">
+                    </div>
+
+                    <div class="col-md-12"><h5 class="text-primary border-bottom pb-2 mt-4">Social Media</h5></div>
+                    <div class="col-md-4"><label>Facebook</label><input type="text" name="facebook" class="form-control" value="{{ config.facebook }}"></div>
+                    <div class="col-md-4"><label>Instagram</label><input type="text" name="instagram" class="form-control" value="{{ config.instagram }}"></div>
+                    <div class="col-md-4"><label>YouTube</label><input type="text" name="youtube" class="form-control" value="{{ config.youtube }}"></div>
+
+                    <input type="hidden" name="max_booking_days" value="1">
+                    <input type="hidden" name="max_rooms_per_booking" value="1">
+                </div>
+                
+                <div class="mt-4 text-end">
+                    <button class="btn btn-primary btn-lg px-5">Save Settings</button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="tab-pane fade" id="hero">
+            <h4>Hall Logo & Photos</h4>
+             <div class="card p-3 mb-4 shadow-sm bg-light">
+                <form action="/{{ config.extension }}/admin/upload_logo" method="post" enctype="multipart/form-data" class="d-flex gap-2">
+                    <input type="file" name="logo" class="form-control" required>
+                    <button class="btn btn-dark">Upload Logo</button>
+                </form>
+            </div>
+            <form action="/{{ config.extension }}/admin/upload_hero" method="post" enctype="multipart/form-data" class="mb-4 d-flex gap-2">
+                <input type="file" name="images" class="form-control w-50" multiple required>
+                <button class="btn btn-success">Upload Slider Photos</button>
+            </form>
+            <div class="row">
+                {% for img in hero_images %}
+                <div class="col-md-3 mb-3 text-center">
+                    <img src="{{ img.image_url }}" class="img-thumbnail" style="height: 150px;">
+                    <form action="/{{ config.extension }}/admin/delete_hero" method="post" class="mt-2"><input type="hidden" name="img_id" value="{{ img.id }}"><button class="btn btn-sm btn-danger">Delete</button></form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        
+         <div class="tab-pane fade" id="logs">
+            <table class="table table-striped mb-0"><thead><tr><th>Time</th><th>User</th><th>Action</th><th>Details</th></tr></thead><tbody>{% for log in logs %}<tr><td>{{ log.timestamp.strftime('%Y-%m-%d %H:%M') }}</td><td>{{ log.user }}</td><td>{{ log.action }}</td><td>{{ log.details }}</td></tr>{% endfor %}</tbody></table>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        var calendarEl = document.getElementById('calendarView');
+        if (calendarEl) {
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                headerToolbar: { left: 'prev,next today', center: 'title', right: 'dayGridMonth,listMonth' },
+                events: '/{{ config.extension }}/admin/api/hall_calendar',
+                eventClick: function(info) {
+                    if (info.event.url) {
+                        window.location.href = info.event.url;
+                        info.jsEvent.preventDefault();
+                    }
+                }
+            });
+            calendar.render();
+        }
+    });
+</script>
+{% endblock %}
